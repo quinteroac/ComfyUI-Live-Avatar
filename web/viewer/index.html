@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live Avatar</title>
+<script type="importmap">{"imports":{"three":"../three/three.module.min.mjs","three/addons/postprocessing/Pass.js":"../three/Pass.mjs"}}</script>
+<style>
+  :root { color-scheme: dark; --bg: #16181d; --panel: #1f2229cc; --line: #ffffff1c; --text: #e8e9ec; --dim: #9ba0ab; --accent: #6ea8fe; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 13px/1.35 system-ui, sans-serif; overflow: hidden; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #bar { position: fixed; left: 10px; right: 10px; bottom: 10px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  button { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; font: inherit; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.on { background: var(--accent); border-color: var(--accent); color: #0d1117; }
+  #params { position: fixed; top: 10px; right: 10px; bottom: 54px; width: 220px; overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; display: none; }
+  #params.open { display: block; }
+  #params label { display: grid; grid-template-columns: 1fr 34px; color: var(--dim); font-size: 11px; margin-bottom: 4px; }
+  #params input { grid-column: 1 / 3; width: 100%; accent-color: var(--accent); margin: 0; }
+  #msg { position: fixed; inset: 0; display: grid; place-items: center; color: var(--dim); pointer-events: none; text-align: center; padding: 16px; }
+</style>
+</head>
+<body>
+<div id="msg">Drop a .lav file here</div>
+<div id="params"></div>
+<div id="bar"></div>
+<script type="module" src="viewer.mjs"></script>
+</body>
+</html>

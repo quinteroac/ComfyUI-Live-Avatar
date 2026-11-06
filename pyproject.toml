@@ -1,0 +1,5 @@
+[project]
+name = "comfyui-live-avatar"
+description = "Turn one anime character image into a rigged, animated 2.5D avatar for three.js."
+version = "0.1.0"
+dependencies = []

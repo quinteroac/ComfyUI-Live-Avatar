@@ -1,0 +1,9 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Live Avatar</title>
+<script>
+  const options = new URLSearchParams(location.search);
+  if (!options.has("file")) options.set("file", "../avatar.lav");
+  if (__NO_TRACKING__) options.set("tracking", "0");
+  location.replace("viewer/index.html?" + options);
+</script>

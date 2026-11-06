@@ -1,0 +1,973 @@
+{
+ "last_node_id": 20,
+ "last_link_id": 23,
+ "nodes": [
+  {
+   "id": 1,
+   "type": "LoadImage",
+   "pos": [
+    40,
+    60
+   ],
+   "size": [
+    320,
+    420
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      2,
+      7
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "MASK",
+     "type": "MASK",
+     "links": [],
+     "slot_index": 1
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LoadImage"
+   },
+   "widgets_values": [
+    "live_avatar_example.png",
+    "image"
+   ]
+  },
+  {
+   "id": 2,
+   "type": "WeVisOneVLLoader",
+   "pos": [
+    40,
+    520
+   ],
+   "size": [
+    320,
+    90
+   ],
+   "flags": {},
+   "order": 1,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "CLIP",
+     "type": "CLIP",
+     "links": [
+      1
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "WeVisOneVLLoader"
+   },
+   "widgets_values": [
+    "wevisone_vl_4b_int8_convrot.safetensors"
+   ]
+  },
+  {
+   "id": 3,
+   "type": "LiveAvatarSegment",
+   "pos": [
+    420,
+    60
+   ],
+   "size": [
+    280,
+    90
+   ],
+   "flags": {},
+   "order": 2,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "clip",
+     "type": "CLIP",
+     "link": 1
+    },
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "link": 2
+    },
+    {
+     "name": "alpha",
+     "type": "MASK",
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "name": "segments",
+     "type": "LIVE_AVATAR_SEGMENTS",
+     "links": [
+      4,
+      9
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "preview",
+     "type": "IMAGE",
+     "links": [
+      3
+     ],
+     "slot_index": 1
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LiveAvatarSegment"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 4,
+   "type": "PreviewImage",
+   "pos": [
+    420,
+    190
+   ],
+   "size": [
+    280,
+    420
+   ],
+   "flags": {},
+   "order": 3,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "link": 3
+    }
+   ],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "PreviewImage"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 5,
+   "type": "LiveAvatarBuild",
+   "pos": [
+    760,
+    60
+   ],
+   "size": [
+    280,
+    70
+   ],
+   "flags": {},
+   "order": 4,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "segments",
+     "type": "LIVE_AVATAR_SEGMENTS",
+     "link": 4
+    },
+    {
+     "name": "seethrough_parts",
+     "type": "SEETHROUGH_PARTS",
+     "link": null
+    },
+    {
+     "name": "depth",
+     "type": "IMAGE",
+     "link": 8
+    },
+    {
+     "name": "plate",
+     "type": "IMAGE",
+     "link": 23
+    },
+    {
+     "name": "head_splat",
+     "type": "SPLAT",
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "name": "avatar",
+     "type": "LIVE_AVATAR",
+     "links": [
+      5,
+      6
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LiveAvatarBuild"
+   },
+   "widgets_values": [
+    false
+   ]
+  },
+  {
+   "id": 6,
+   "type": "LiveAvatarSave",
+   "pos": [
+    1100,
+    60
+   ],
+   "size": [
+    460,
+    680
+   ],
+   "flags": {},
+   "order": 5,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "avatar",
+     "type": "LIVE_AVATAR",
+     "link": 5
+    }
+   ],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "LiveAvatarSave"
+   },
+   "widgets_values": [
+    "live_avatar/avatar"
+   ]
+  },
+  {
+   "id": 7,
+   "type": "LiveAvatarExport",
+   "pos": [
+    1100,
+    1240
+   ],
+   "size": [
+    460,
+    130
+   ],
+   "flags": {},
+   "order": 6,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "avatar",
+     "type": "LIVE_AVATAR",
+     "link": 6
+    }
+   ],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "LiveAvatarExport"
+   },
+   "widgets_values": [
+    "live_avatar_export/avatar",
+    true
+   ]
+  },
+  {
+   "id": 8,
+   "type": "MarkdownNote",
+   "pos": [
+    760,
+    180
+   ],
+   "size": [
+    280,
+    240
+   ],
+   "flags": {},
+   "order": 7,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "MarkdownNote"
+   },
+   "widgets_values": [
+    "**WeVisOne + Anima inpaint**.\n\nDepth Anything adds relief. Anima paints the body hidden behind arms and hair: describe the clothes in the prompt.\n\nUse a front-facing character with arms apart on a plain background.\n\nThe result is a .lav file in output/live_avatar. The viewer appears on the Save node after the run: mouse look, clips, mic lip sync and webcam tracking."
+   ],
+   "title": "Live Avatar"
+  },
+  {
+   "id": 9,
+   "type": "DepthAnythingV2Preprocessor",
+   "pos": [
+    760,
+    460
+   ],
+   "size": [
+    280,
+    100
+   ],
+   "flags": {},
+   "order": 8,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "link": 7
+    }
+   ],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      8
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "DepthAnythingV2Preprocessor"
+   },
+   "widgets_values": [
+    "depth_anything_v2_vitb.pth",
+    1024
+   ]
+  },
+  {
+   "id": 10,
+   "type": "LiveAvatarPlate",
+   "pos": [
+    40,
+    660
+   ],
+   "size": [
+    320,
+    70
+   ],
+   "flags": {},
+   "order": 9,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "segments",
+     "type": "LIVE_AVATAR_SEGMENTS",
+     "link": 9
+    }
+   ],
+   "outputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "links": [
+      12
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "mask",
+     "type": "MASK",
+     "links": [
+      15
+     ],
+     "slot_index": 1
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LiveAvatarPlate"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 11,
+   "type": "UNETLoader",
+   "pos": [
+    40,
+    780
+   ],
+   "size": [
+    320,
+    90
+   ],
+   "flags": {},
+   "order": 10,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "MODEL",
+     "type": "MODEL",
+     "links": [
+      16
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "UNETLoader"
+   },
+   "widgets_values": [
+    "anima/anima-aesthetic-v1.1.safetensors",
+    "default"
+   ]
+  },
+  {
+   "id": 12,
+   "type": "CLIPLoader",
+   "pos": [
+    40,
+    910
+   ],
+   "size": [
+    320,
+    110
+   ],
+   "flags": {},
+   "order": 11,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "CLIP",
+     "type": "CLIP",
+     "links": [
+      10,
+      11
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CLIPLoader"
+   },
+   "widgets_values": [
+    "qwen_3_06b_base.safetensors",
+    "stable_diffusion",
+    "default"
+   ]
+  },
+  {
+   "id": 13,
+   "type": "VAELoader",
+   "pos": [
+    40,
+    1060
+   ],
+   "size": [
+    320,
+    60
+   ],
+   "flags": {},
+   "order": 12,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "VAE",
+     "type": "VAE",
+     "links": [
+      13,
+      21
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "VAELoader"
+   },
+   "widgets_values": [
+    "wan_2.1_vae.safetensors"
+   ]
+  },
+  {
+   "id": 14,
+   "type": "CLIPTextEncode",
+   "pos": [
+    420,
+    660
+   ],
+   "size": [
+    280,
+    130
+   ],
+   "flags": {},
+   "order": 13,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "clip",
+     "type": "CLIP",
+     "link": 10
+    }
+   ],
+   "outputs": [
+    {
+     "name": "CONDITIONING",
+     "type": "CONDITIONING",
+     "links": [
+      17
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CLIPTextEncode"
+   },
+   "widgets_values": [
+    "masterpiece, best quality, score_9, clothes, shirt, jacket, torso, plain shading"
+   ],
+   "title": "Clothes prompt"
+  },
+  {
+   "id": 15,
+   "type": "CLIPTextEncode",
+   "pos": [
+    420,
+    830
+   ],
+   "size": [
+    280,
+    110
+   ],
+   "flags": {},
+   "order": 14,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "clip",
+     "type": "CLIP",
+     "link": 11
+    }
+   ],
+   "outputs": [
+    {
+     "name": "CONDITIONING",
+     "type": "CONDITIONING",
+     "links": [
+      18
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CLIPTextEncode"
+   },
+   "widgets_values": [
+    "worst quality, low quality, score_1, score_2, score_3, blurry, arms, hands, fingers, hair, white, empty, text, watermark"
+   ],
+   "title": "Negative"
+  },
+  {
+   "id": 16,
+   "type": "VAEEncode",
+   "pos": [
+    420,
+    980
+   ],
+   "size": [
+    280,
+    60
+   ],
+   "flags": {},
+   "order": 15,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "pixels",
+     "type": "IMAGE",
+     "link": 12
+    },
+    {
+     "name": "vae",
+     "type": "VAE",
+     "link": 13
+    }
+   ],
+   "outputs": [
+    {
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      14
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "VAEEncode"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 17,
+   "type": "SetLatentNoiseMask",
+   "pos": [
+    420,
+    1080
+   ],
+   "size": [
+    280,
+    60
+   ],
+   "flags": {},
+   "order": 16,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "samples",
+     "type": "LATENT",
+     "link": 14
+    },
+    {
+     "name": "mask",
+     "type": "MASK",
+     "link": 15
+    }
+   ],
+   "outputs": [
+    {
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      19
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "SetLatentNoiseMask"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 18,
+   "type": "KSampler",
+   "pos": [
+    760,
+    600
+   ],
+   "size": [
+    280,
+    270
+   ],
+   "flags": {},
+   "order": 17,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "model",
+     "type": "MODEL",
+     "link": 16
+    },
+    {
+     "name": "positive",
+     "type": "CONDITIONING",
+     "link": 17
+    },
+    {
+     "name": "negative",
+     "type": "CONDITIONING",
+     "link": 18
+    },
+    {
+     "name": "latent_image",
+     "type": "LATENT",
+     "link": 19
+    }
+   ],
+   "outputs": [
+    {
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      20
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "KSampler"
+   },
+   "widgets_values": [
+    42,
+    "fixed",
+    24,
+    4.0,
+    "er_sde",
+    "simple",
+    0.65
+   ]
+  },
+  {
+   "id": 19,
+   "type": "VAEDecode",
+   "pos": [
+    760,
+    910
+   ],
+   "size": [
+    280,
+    60
+   ],
+   "flags": {},
+   "order": 18,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "samples",
+     "type": "LATENT",
+     "link": 20
+    },
+    {
+     "name": "vae",
+     "type": "VAE",
+     "link": 21
+    }
+   ],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      22,
+      23
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "VAEDecode"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 20,
+   "type": "PreviewImage",
+   "pos": [
+    1100,
+    780
+   ],
+   "size": [
+    460,
+    420
+   ],
+   "flags": {},
+   "order": 19,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "link": 22
+    }
+   ],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "PreviewImage"
+   },
+   "widgets_values": [],
+   "title": "Plate"
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   0,
+   3,
+   0,
+   "CLIP"
+  ],
+  [
+   2,
+   1,
+   0,
+   3,
+   1,
+   "IMAGE"
+  ],
+  [
+   3,
+   3,
+   1,
+   4,
+   0,
+   "IMAGE"
+  ],
+  [
+   4,
+   3,
+   0,
+   5,
+   0,
+   "LIVE_AVATAR_SEGMENTS"
+  ],
+  [
+   5,
+   5,
+   0,
+   6,
+   0,
+   "LIVE_AVATAR"
+  ],
+  [
+   6,
+   5,
+   0,
+   7,
+   0,
+   "LIVE_AVATAR"
+  ],
+  [
+   7,
+   1,
+   0,
+   9,
+   0,
+   "IMAGE"
+  ],
+  [
+   8,
+   9,
+   0,
+   5,
+   2,
+   "IMAGE"
+  ],
+  [
+   9,
+   3,
+   0,
+   10,
+   0,
+   "LIVE_AVATAR_SEGMENTS"
+  ],
+  [
+   10,
+   12,
+   0,
+   14,
+   0,
+   "CLIP"
+  ],
+  [
+   11,
+   12,
+   0,
+   15,
+   0,
+   "CLIP"
+  ],
+  [
+   12,
+   10,
+   0,
+   16,
+   0,
+   "IMAGE"
+  ],
+  [
+   13,
+   13,
+   0,
+   16,
+   1,
+   "VAE"
+  ],
+  [
+   14,
+   16,
+   0,
+   17,
+   0,
+   "LATENT"
+  ],
+  [
+   15,
+   10,
+   1,
+   17,
+   1,
+   "MASK"
+  ],
+  [
+   16,
+   11,
+   0,
+   18,
+   0,
+   "MODEL"
+  ],
+  [
+   17,
+   14,
+   0,
+   18,
+   1,
+   "CONDITIONING"
+  ],
+  [
+   18,
+   15,
+   0,
+   18,
+   2,
+   "CONDITIONING"
+  ],
+  [
+   19,
+   17,
+   0,
+   18,
+   3,
+   "LATENT"
+  ],
+  [
+   20,
+   18,
+   0,
+   19,
+   0,
+   "LATENT"
+  ],
+  [
+   21,
+   13,
+   0,
+   19,
+   1,
+   "VAE"
+  ],
+  [
+   22,
+   19,
+   0,
+   20,
+   0,
+   "IMAGE"
+  ],
+  [
+   23,
+   19,
+   0,
+   5,
+   3,
+   "IMAGE"
+  ]
+ ],
+ "groups": [],
+ "config": {},
+ "extra": {
+  "ds": {
+   "scale": 0.8,
+   "offset": [
+    40,
+    40
+   ]
+  }
+ },
+ "version": 0.4
+}
