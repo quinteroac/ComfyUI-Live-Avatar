@@ -149,12 +149,13 @@ class LiveAvatarBuild(io.ComfyNode):
                 io.Splat.Input("head_splat", optional=True, tooltip="Splat of the head alone. Takes over from the layers in wide head turns."),
                 AvatarVariants.Input("variants", optional=True, tooltip="Drawn closed and smiling eyes and vowel mouths from Live Avatar Variants."),
                 io.Boolean.Input("splat_hair", default=False, tooltip="Draw the hair with the splat at every angle: no hair transition, but softer than the drawing when facing front."),
+                io.Float.Input("chest_physics", default=1.0, min=0.0, max=3.0, step=0.05, tooltip="Bounce of the breasts when the segmentation finds them. 0 keeps the chest rigid."),
             ],
             outputs=[Avatar.Output(display_name="avatar")],
         )
 
     @classmethod
-    def execute(cls, segments, splat_hair=False, seethrough_parts=None, depth=None, plate=None, head_splat=None, variants=None) -> io.NodeOutput:
+    def execute(cls, segments, splat_hair=False, chest_physics=1.0, seethrough_parts=None, depth=None, plate=None, head_splat=None, variants=None) -> io.NodeOutput:
         hidden = None
         height, width = segments["image"].shape[:2]
         if depth is not None:
@@ -167,7 +168,7 @@ class LiveAvatarBuild(io.ComfyNode):
             plate = (plate[0, ..., :3].cpu().numpy() * 255).round().astype(np.uint8)
         if head_splat is not None:
             head_splat = tuple(t[0].float().cpu().numpy() for t in (head_splat.positions, head_splat.scales, head_splat.rotations, head_splat.opacities, head_splat.sh))
-        return io.NodeOutput(rig.build_avatar(segments, hidden, depth, plate, head_splat, splat_hair, variants))
+        return io.NodeOutput(rig.build_avatar(segments, hidden, depth, plate, head_splat, splat_hair, variants, chest_physics))
 
 
 class LiveAvatarLoad(io.ComfyNode):

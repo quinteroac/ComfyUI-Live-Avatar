@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as F
 
 BODY_QUERIES = {"person": "person", "hair": "hair", "face": "face", "neck": "neck", "arms": "arms", "hands": "hands",
-                "legs": "legs", "skirt": "skirt", "tail": "tail", "animal_ears": "animal ears"}
+                "legs": "legs", "skirt": "skirt", "tail": "tail", "animal_ears": "animal ears", "breasts": "breasts"}
 HEAD_QUERIES = {"face": "face skin", "bangs": "bangs", "eye": "eye", "iris": "iris", "lash": "eyelashes", "brow": "eyebrow",
                 "mouth": "mouth"}
 JOINTS = ["shoulder", "elbow", "wrist", "hip", "knee", "ankle"]
@@ -80,6 +80,9 @@ def segment(perceive, clip, image, alpha=None):
         masks["mouth"] = head["mouth"].amax(0)
     paired = [(_split_by_side(found[name], center_x), part) for name, part in (("arms", "arm"), ("hands", "hand"), ("legs", "leg"), ("animal_ears", "animal_ear"))]
     paired += [(_split_at_center(head[name], center_x), name) for name in ("eye", "iris", "lash", "brow") if len(head[name])]
+    # Breasts are no layer of their own: they only weight the torso toward a soft-body bone.
+    if len(found["breasts"]):
+        paired.append((_split_at_center(found["breasts"], center_x), "breast"))
     for sides, part in paired:
         for suffix, side in zip(("l", "r"), sides):
             if side is not None:

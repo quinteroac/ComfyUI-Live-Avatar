@@ -167,6 +167,13 @@ class Layers:
         if solid.any():  # Edge colors still contain the old background.
             self.rgb = _nearest_fill(self.rgb, solid, ~solid)
         self.layers = {}
+        # A chest matte smaller than this share of the face is matte noise, not a bust that moves.
+        face_area = self.visible["face"].sum()
+        self.breasts = {}
+        for side in SIDES:
+            mask = seg["masks"].get("breast_" + side)
+            if mask is not None and ((mask > 0.5) & (self.alpha > 0.5)).sum() > face_area * 0.15:
+                self.breasts[side] = (mask > 0.5) & (self.alpha > 0.5)
         self._split_hair()
         self._split_face_parts()
 
@@ -512,6 +519,9 @@ def build_skeleton(layers, joints):
     if "skirt" in layers.layers:
         box = _bbox(layers.visible["skirt"])
         skeleton.add("skirt", "hips", ((box[0] + box[2]) / 2, box[1]))
+    for side, mask in layers.breasts.items():
+        ys, xs = np.nonzero(mask)
+        skeleton.add("breast_" + side, "chest", (xs.mean(), ys.mean()))
     return skeleton
 
 
@@ -782,6 +792,8 @@ def build_parts(layers, skeleton, relief=None, splat=None):
         vertices, triangles = grid_mesh(rgba[..., 3] > 0, int(step))
         segments, blend = _layer_segments(name, skeleton)
         bones, weights = skin(vertices, segments, max(blend * face_h, 1.0))
+        if name == "torso":
+            _soft_chest(layers, skeleton, vertices, bones, weights)
         # Depth over the part's whole tile: vertices sample it, and the encoder turns it into the normal map.
         bx0, by0 = vertices.min(0).astype(int)
         bx1, by1 = vertices.max(0).astype(int) + 1
@@ -812,6 +824,21 @@ def build_parts(layers, skeleton, relief=None, splat=None):
     _add_mouth(layers, skeleton, parts, ellipse, splat)
     _add_face_morphs(layers, parts)
     return {name: parts[name] for name in DRAW_ORDER if name in parts}
+
+
+def _soft_chest(layers, skeleton, vertices, bones, weights):
+    """Torso vertices over the breasts partly follow their soft-body bone, fading out toward the matte's edge."""
+    face_w = layers.face_box[2] - layers.face_box[0]
+    px = np.clip(vertices[:, 0].astype(int), 0, layers.width - 1)
+    py = np.clip(vertices[:, 1].astype(int), 0, layers.height - 1)
+    for side, mask in layers.breasts.items():
+        soft = cv2.GaussianBlur(_erode(mask, max(int(face_w * 0.04), 1)).astype(np.float32), (0, 0), face_w * 0.08)[py, px]
+        moving = soft > 0.01
+        weights[moving] *= (1 - soft[moving])[:, None]
+        # The weakest influence makes room for the breast bone.
+        bones[moving, 3] = skeleton.index["breast_" + side]
+        weights[moving, 3] = soft[moving]
+    weights /= weights.sum(1, keepdims=True)
 
 
 def _add_mouth(layers, skeleton, parts, ellipse, splat):
@@ -955,10 +982,17 @@ def _add_variants(layers, variants):
                 layers.layers[name + "_" + side] = half
 
 
-def build_avatar(seg, hidden=None, depth=None, plate=None, head_splat=None, splat_hair=False, variants=None):
+def _chest_reach(layers):
+    """How far each breast may move, in world units: a share of its height."""
+    return {"breast_" + side: float(_bbox(mask)[3] - _bbox(mask)[1]) * 0.1 / layers.height for side, mask in layers.breasts.items()}
+
+
+def build_avatar(seg, hidden=None, depth=None, plate=None, head_splat=None, splat_hair=False, variants=None, chest_physics=1.0):
     """head_splat: positions, scales, rotations (wxyz), opacities and sh arrays of a splat of the head alone.
-    variants: full-canvas RGBA patches keyed by VARIANT_LAYERS."""
+    variants: full-canvas RGBA patches keyed by VARIANT_LAYERS. chest_physics scales the breast bounce; 0 leaves the chest rigid."""
     layers = Layers(seg, hidden, plate)
+    if chest_physics <= 0:
+        layers.breasts = {}
     layers.build()
     _add_variants(layers, variants or {})
     splat = None if head_splat is None else HeadSplat(layers, *head_splat)
@@ -969,4 +1003,4 @@ def build_avatar(seg, hidden=None, depth=None, plate=None, head_splat=None, spla
     face_unit = (layers.face_box[2] - layers.face_box[0]) / layers.height
     params = build_params(skeleton.index, parts, face_unit, splat is not None)
     return {"width": layers.width, "height": layers.height, "bones": skeleton.bones, "parts": parts, "params": params,
-            "clips": build_clips(params), "expressions": build_expressions(params), "springs": build_springs(skeleton.index), "face_box": [int(v) for v in layers.face_box], "head_splat": splat, "splat_hair": splat_hair}
+            "clips": build_clips(params), "expressions": build_expressions(params), "springs": build_springs(skeleton.index, _chest_reach(layers), chest_physics), "face_box": [int(v) for v in layers.face_box], "head_splat": splat, "splat_hair": splat_hair}

@@ -126,7 +126,8 @@ def build_clips(params):
     return clips
 
 
-def build_springs(bones):
+def build_springs(bones, chest_reach, chest_physics):
+    """chest_reach: breast bone -> how far it may move in world units."""
     springs = []
     for chain, stiffness, gain in (("lock_l", 26.0, 1.0), ("lock_r", 26.0, 1.0), ("tail", 18.0, 1.3)):
         for i in range(LOCK_BONES):
@@ -136,4 +137,7 @@ def build_springs(bones):
     for name, stiffness, gain in (("bangs", 60.0, 0.45), ("skirt", 45.0, 0.5), ("animal_ear_l", 80.0, 0.3), ("animal_ear_r", 80.0, 0.3)):
         if name in bones:
             springs.append({"bone": name, "stiffness": stiffness, "damping": 7.0, "gain": gain})
+    # Breasts lag the chest's movement up, down and sideways: a damped offset rather than a swinging angle.
+    for name, reach in chest_reach.items():
+        springs.append({"bone": name, "mode": "bounce", "stiffness": 160.0, "damping": 9.0, "gain": 0.5 * chest_physics, "reach": reach})
     return springs

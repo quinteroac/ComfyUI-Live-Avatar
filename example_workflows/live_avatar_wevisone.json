@@ -212,7 +212,8 @@
     "Node name for S&R": "LiveAvatarBuild"
    },
    "widgets_values": [
-    false
+    false,
+    1.0
    ]
   },
   {

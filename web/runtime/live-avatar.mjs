@@ -232,6 +232,7 @@ export class LiveAvatar extends THREE.Group {
 
     this.springs = header.springs.filter((s) => this.boneByName[s.bone]).map((s) => ({
       ...s, node: this.boneByName[s.bone], angle: 0, speed: 0, last: new THREE.Vector3(), lastSpeed: 0, primed: false,
+      offset: new THREE.Vector2(), velocity: new THREE.Vector2(), lastVelocity: new THREE.Vector3(),
     }));
   }
 
@@ -384,6 +385,10 @@ export class LiveAvatar extends THREE.Group {
     if (step <= 0) return;
     const position = new THREE.Vector3();
     for (const spring of this.springs) {
+      if (spring.mode === "bounce") {
+        this.bounce(spring, step);
+        continue;
+      }
       position.setFromMatrixPosition(spring.node.parent.matrixWorld);
       if (!spring.primed) {
         spring.last.copy(position);
@@ -400,6 +405,26 @@ export class LiveAvatar extends THREE.Group {
       spring.node.rotation.z += spring.angle;
     }
     this.updateMatrixWorld(true);
+  }
+
+  // A soft body: the bone's offset is a damped spring pushed against its own acceleration, so it lags, overshoots and settles.
+  bounce(spring, step) {
+    const position = spring.node.getWorldPosition(new THREE.Vector3());
+    if (!spring.primed) {
+      spring.last.copy(position);
+      spring.primed = true;
+    }
+    const velocity = position.clone().sub(spring.last).divideScalar(step);
+    const push = velocity.clone().sub(spring.lastVelocity).divideScalar(step);
+    spring.last.copy(position);
+    spring.lastVelocity.copy(velocity);
+    for (const axis of ["x", "y"]) {
+      const force = -spring.stiffness * spring.offset[axis] - spring.damping * spring.velocity[axis] - push[axis] * spring.gain;
+      spring.velocity[axis] += force * step;
+      spring.offset[axis] = Math.min(Math.max(spring.offset[axis] + spring.velocity[axis] * step, -spring.reach), spring.reach);
+    }
+    spring.node.position.x += spring.offset.x;
+    spring.node.position.y += spring.offset.y;
   }
 
   dispose() {

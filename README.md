@@ -13,7 +13,7 @@ Needs [ComfyUI-WeVisOne-VL](https://huggingface.co/paralaif/ComfyUI-WeVisOne-VL)
 | **Live Avatar Plate** | Prepares the body hidden behind arms and hair for any inpaint pass. |
 | **Live Avatar Variant Mask** | Head crop and mask for inpainting one drawn variant: `eyes_closed`, `eyes_smile`, `mouth_a`, `mouth_i` or `mouth_o`. |
 | **Live Avatar Variants** | Collects the inpainted variants for Build. Only each variant's masked area is used, with the crop's color shift removed. |
-| **Live Avatar Build** | Builds layers, meshes, bones, morphs and clips. Optional: `SEETHROUGH_PARTS` for hidden pixels and depth, `depth` for relief, `plate` for the inpainted body, `head_splat` for wide head turns, `variants` for drawn eyes and mouths. |
+| **Live Avatar Build** | Builds layers, meshes, bones, morphs and clips. Optional: `SEETHROUGH_PARTS` for hidden pixels and depth, `depth` for relief, `plate` for the inpainted body, `head_splat` for wide head turns, `variants` for drawn eyes and mouths, `chest_physics` for breast bounce. |
 | **Live Avatar Load** | Loads a saved `.lav` from `output/live_avatar`, to add clips or export it again without rebuilding. |
 | **Live Avatar Motion** | Adds a clip retargeted from captured body motion: `MHR_POSE_DATA` from [InstantHMR](https://github.com/jtydhr88/ComfyUI-InstantHMR) or SAM 3D Body. |
 | **Live Avatar Save** | Writes `output/live_avatar/*.lav` and shows a live viewer on the node. |
@@ -28,7 +28,10 @@ In `example_workflows`:
 - `live_avatar_seethrough_splat_head.json`: See-through for the hidden body and depth, Idol for the head. About 9 minutes on a 16 GB GPU.
 - `live_avatar_seethrough_wevisone.json`: WeVisOne picks the parts, See-through paints what is behind them. About 6 minutes on a 16 GB GPU.
 - `live_avatar_variants.json`: `live_avatar_wevisone.json` plus Anima inpaints of closed and smiling eyes and the a, i and o mouths. Put the character's tags in the variant prompts but not the eye color in the closed-eye ones, or Anima paints the eyes open again.
+- `live_avatar_seethrough_variants.json`: `live_avatar_seethrough_wevisone.json` plus the same five Anima variant inpaints.
 - `live_avatar_motion.json`: a video through InstantHMR onto a saved avatar as a new clip. The performer's usual facing and lean become the avatar's front, so the camera angle does not matter.
+
+When the segmentation finds breasts, Build weights the torso over them to two soft-body bones that lag the body's movement and settle. `chest_physics` scales the bounce, 0 keeps the chest rigid. Hair hanging over the chest does not follow.
 
 Use a front-facing character with arms apart on a plain background. A larger face gives better eyes and mouth: at 1216 px tall a full-body face is only about 100 px.
 
@@ -86,7 +89,7 @@ parts     draw order; position (f32 x3), uv (f32 x2), skinIndex (u16 x4), skinWe
 params    name -> drivers [{bone, channel, scale}], morphs [part names] and/or fades [[part, start, end]]
 clips     name -> duration, loop, tracks [{param, keys [[time, value]], linear (optional)}]
 expressions name -> {param: value}
-springs   bone, stiffness, damping, gain
+springs   bone, stiffness, damping, gain; mode "bounce" with reach (world units) is a damped offset instead of a swinging angle
 headSplat optional: section (.spz), scale, position on the head bone, fade (layers it replaces), alwaysOn
 ```
 
