@@ -17,6 +17,9 @@ URL options, joined with &
   look=0           do not follow the mouse
   camera=1         start webcam face tracking
   mic=1            start lip sync from the microphone
+  expression=smile start with an expression: smile, surprise, angry, sad, wink, sleepy, shy
+  light=0.4,0.5    turn on shading with the light at x,y in -1..1, optional strength third
+Keys 1 to 8 switch expressions while the page has focus.
 
 Your own three.js app
   Copy runtime, three, avatar.lav and, for webcam tracking, mediapipe.
@@ -31,4 +34,5 @@ Your own three.js app
     avatar.update(deltaSeconds);
 
   avatar.play(name), avatar.stop(name), avatar.setParam(name, value) and
-  avatar.lookAt(x, y) drive it. avatar.params and avatar.clips list what it has.
+  avatar.lookAt(x, y), avatar.setExpression(name), avatar.setMouth(level, vowel),
+  avatar.speak(text) and avatar.setLight({ x, y, strength }) drive it. avatar.params and avatar.clips list what it has.

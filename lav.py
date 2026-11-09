@@ -1,8 +1,10 @@
-"""The .lav container: "LAV1", u32 JSON length, JSON, then 4-byte aligned binary sections (mesh arrays and the atlas)."""
+"""The .lav container: "LAV1", u32 JSON length, JSON, then 4-byte aligned binary sections (mesh arrays and the atlases).
+An avatar is either built ({"parts", "bones", ...} in pixels) or loaded from a file ({"header", "blob"})."""
 import io
 import json
 import struct
 
+import cv2
 import numpy as np
 import torch
 from comfy_extras.nodes_gaussian_splat import _gaussian_spz_bytes
@@ -12,6 +14,7 @@ from scipy import ndimage
 MAGIC = b"LAV1"
 VERSION = 1
 PAD = 2
+NORMAL_SLOPE = 0.5
 
 
 def _tile(rgba, vertices):
@@ -55,6 +58,55 @@ def _bleed(rgba):
     return out
 
 
+def _normals(field):
+    """Normal map of a depth field in pixels, near is +z. Image rows go down, the avatar's y goes up.
+    Slopes are halved: drawn faces are flat, and the head dome would put a hard terminator across the cheek."""
+    gy, gx = np.gradient(cv2.GaussianBlur(field, (0, 0), 1.0))
+    normal = np.dstack([-gx * NORMAL_SLOPE, gy * NORMAL_SLOPE, np.ones_like(field)])
+    normal /= np.linalg.norm(normal, axis=2, keepdims=True)
+    return np.dstack([((normal * 0.5 + 0.5) * 255).round().astype(np.uint8), np.full(field.shape, 255, np.uint8)])
+
+
+def _webp(rgba):
+    buffer = io.BytesIO()
+    Image.fromarray(rgba, "RGBA").save(buffer, "WEBP", lossless=True, exact=True)
+    return buffer.getvalue()
+
+
+def _bone_world(position, width, height):
+    x, y, z = position
+    return [(x - width / 2) / height, (height - y) / height, z / height]
+
+
+def load(path):
+    with open(path, "rb") as f:
+        data = f.read()
+    if data[:4] != MAGIC:
+        raise ValueError(f"Live Avatar: {path} is not a .lav file.")
+    length = struct.unpack("<I", data[4:8])[0]
+    return {"header": json.loads(data[8:8 + length]), "blob": data[8 + length:]}
+
+
+def rig_of(avatar):
+    """Bone positions in world units (x centered, y up, one unit is the canvas height) and params."""
+    if "header" in avatar:
+        header = avatar["header"]
+        return {b["name"]: np.array(b["position"], np.float64) for b in header["bones"]}, header["params"]
+    return {b["name"]: np.array(_bone_world(b["pos"], avatar["width"], avatar["height"]), np.float64) for b in avatar["bones"]}, avatar["params"]
+
+
+def add_clip(avatar, name, clip):
+    if "header" in avatar:
+        return {"header": {**avatar["header"], "clips": {**avatar["header"]["clips"], name: clip}}, "blob": avatar["blob"]}
+    return {**avatar, "clips": {**avatar["clips"], name: clip}}
+
+
+def _pack_header(header, blob):
+    text = json.dumps(header, separators=(",", ":")).encode()
+    text += b" " * (-(len(text) + 8) % 4)
+    return MAGIC + struct.pack("<I", len(text)) + text + blob
+
+
 def _head_splat(avatar, section, scale):
     """Splat bytes in their own unit frame, plus the transform that seats them on the head bone."""
     splat = avatar["head_splat"]
@@ -67,6 +119,8 @@ def _head_splat(avatar, section, scale):
 
 
 def encode(avatar):
+    if "header" in avatar:
+        return _pack_header(avatar["header"], avatar["blob"])
     width, height = avatar["width"], avatar["height"]
     crops, sizes = {}, {}
     for name, part in avatar["parts"].items():
@@ -78,9 +132,14 @@ def encode(avatar):
         sizes[name] = crops[name][2].shape[1], crops[name][2].shape[0]
     placed, side = _pack(sizes)
     atlas = np.zeros((side, side, 4), np.uint8)
+    normals = np.zeros((side, side, 4), np.uint8)
+    normals[..., 2:] = 255
+    normals[..., :2] = 128
     for name, (x, y) in placed.items():
         tile = crops[name][2]
         atlas[y:y + tile.shape[0], x:x + tile.shape[1]] = tile
+        if "depth" in avatar["parts"][name]:
+            normals[y:y + tile.shape[0], x:x + tile.shape[1]] = _normals(avatar["parts"][name]["depth"])
 
     blob = io.BytesIO()
 
@@ -121,18 +180,10 @@ def encode(avatar):
                       "index": section(part["triangles"].astype(np.uint32).tobytes()),
                       "morphs": morphs})
 
-    buffer = io.BytesIO()
-    Image.fromarray(atlas, "RGBA").save(buffer, "WEBP", lossless=True, exact=True)
-    atlas_section = section(buffer.getvalue())
-
-    bones = []
-    for bone in avatar["bones"]:
-        x, y, z = bone["pos"]
-        bones.append({"name": bone["name"], "parent": bone["parent"], "position": [(x - width / 2) * scale, (height - y) * scale, z * scale]})
-    header = {"version": VERSION, "canvas": [width, height], "atlas": {"section": atlas_section, "size": side, "mime": "image/webp"},
-              "bones": bones, "parts": parts, "params": avatar["params"], "clips": avatar["clips"], "springs": avatar["springs"]}
+    atlas = {"section": section(_webp(atlas)), "normals": section(_webp(normals)), "size": side, "mime": "image/webp"}
+    bones = [{"name": b["name"], "parent": b["parent"], "position": _bone_world(b["pos"], width, height)} for b in avatar["bones"]]
+    header = {"version": VERSION, "canvas": [width, height], "atlas": atlas, "bones": bones, "parts": parts, "params": avatar["params"],
+              "clips": avatar["clips"], "expressions": avatar["expressions"], "springs": avatar["springs"]}
     if avatar["head_splat"] is not None:
         header["headSplat"] = _head_splat(avatar, section, scale)
-    text = json.dumps(header, separators=(",", ":")).encode()
-    text += b" " * (-(len(text) + 8) % 4)
-    return MAGIC + struct.pack("<I", len(text)) + text + blob.getvalue()
+    return _pack_header(header, blob.getvalue())

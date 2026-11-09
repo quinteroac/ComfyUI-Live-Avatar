@@ -1,0 +1,3059 @@
+{
+ "last_node_id": 54,
+ "last_link_id": 92,
+ "nodes": [
+  {
+   "id": 1,
+   "type": "LoadImage",
+   "pos": [
+    40,
+    60
+   ],
+   "size": [
+    320,
+    420
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      2,
+      7
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "MASK",
+     "type": "MASK",
+     "links": [],
+     "slot_index": 1
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LoadImage"
+   },
+   "widgets_values": [
+    "live_avatar_example.png",
+    "image"
+   ]
+  },
+  {
+   "id": 2,
+   "type": "WeVisOneVLLoader",
+   "pos": [
+    40,
+    520
+   ],
+   "size": [
+    320,
+    90
+   ],
+   "flags": {},
+   "order": 1,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "CLIP",
+     "type": "CLIP",
+     "links": [
+      1
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "WeVisOneVLLoader"
+   },
+   "widgets_values": [
+    "wevisone_vl_4b_int8_convrot.safetensors"
+   ]
+  },
+  {
+   "id": 3,
+   "type": "LiveAvatarSegment",
+   "pos": [
+    420,
+    60
+   ],
+   "size": [
+    280,
+    90
+   ],
+   "flags": {},
+   "order": 2,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "clip",
+     "type": "CLIP",
+     "link": 1
+    },
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "link": 2
+    },
+    {
+     "name": "alpha",
+     "type": "MASK",
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "name": "segments",
+     "type": "LIVE_AVATAR_SEGMENTS",
+     "links": [
+      4,
+      9,
+      26,
+      27,
+      40,
+      53,
+      66,
+      79
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "preview",
+     "type": "IMAGE",
+     "links": [
+      3
+     ],
+     "slot_index": 1
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LiveAvatarSegment"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 4,
+   "type": "PreviewImage",
+   "pos": [
+    420,
+    190
+   ],
+   "size": [
+    280,
+    420
+   ],
+   "flags": {},
+   "order": 3,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "link": 3
+    }
+   ],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "PreviewImage"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 5,
+   "type": "LiveAvatarBuild",
+   "pos": [
+    760,
+    60
+   ],
+   "size": [
+    280,
+    70
+   ],
+   "flags": {},
+   "order": 4,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "segments",
+     "type": "LIVE_AVATAR_SEGMENTS",
+     "link": 4
+    },
+    {
+     "name": "seethrough_parts",
+     "type": "SEETHROUGH_PARTS",
+     "link": null
+    },
+    {
+     "name": "depth",
+     "type": "IMAGE",
+     "link": 8
+    },
+    {
+     "name": "plate",
+     "type": "IMAGE",
+     "link": 23
+    },
+    {
+     "name": "head_splat",
+     "type": "SPLAT",
+     "link": null
+    },
+    {
+     "name": "variants",
+     "type": "LIVE_AVATAR_VARIANTS",
+     "link": 92
+    }
+   ],
+   "outputs": [
+    {
+     "name": "avatar",
+     "type": "LIVE_AVATAR",
+     "links": [
+      5,
+      6
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LiveAvatarBuild"
+   },
+   "widgets_values": [
+    false
+   ]
+  },
+  {
+   "id": 6,
+   "type": "LiveAvatarSave",
+   "pos": [
+    1100,
+    60
+   ],
+   "size": [
+    460,
+    680
+   ],
+   "flags": {},
+   "order": 5,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "avatar",
+     "type": "LIVE_AVATAR",
+     "link": 5
+    }
+   ],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "LiveAvatarSave"
+   },
+   "widgets_values": [
+    "live_avatar/avatar"
+   ]
+  },
+  {
+   "id": 7,
+   "type": "LiveAvatarExport",
+   "pos": [
+    1100,
+    1240
+   ],
+   "size": [
+    460,
+    130
+   ],
+   "flags": {},
+   "order": 6,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "avatar",
+     "type": "LIVE_AVATAR",
+     "link": 6
+    }
+   ],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "LiveAvatarExport"
+   },
+   "widgets_values": [
+    "live_avatar_export/avatar",
+    true
+   ]
+  },
+  {
+   "id": 8,
+   "type": "MarkdownNote",
+   "pos": [
+    760,
+    180
+   ],
+   "size": [
+    280,
+    240
+   ],
+   "flags": {},
+   "order": 7,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "MarkdownNote"
+   },
+   "widgets_values": [
+    "**WeVisOne + Anima inpaint**.\n\nDepth Anything adds relief. Anima paints the body hidden behind arms and hair: describe the clothes in the prompt.\n\nUse a front-facing character with arms apart on a plain background.\n\nThe result is a .lav file in output/live_avatar. The viewer appears on the Save node after the run: mouse look, clips, mic lip sync and webcam tracking."
+   ],
+   "title": "Live Avatar"
+  },
+  {
+   "id": 9,
+   "type": "DepthAnythingV2Preprocessor",
+   "pos": [
+    760,
+    460
+   ],
+   "size": [
+    280,
+    100
+   ],
+   "flags": {},
+   "order": 8,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "link": 7
+    }
+   ],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      8
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "DepthAnythingV2Preprocessor"
+   },
+   "widgets_values": [
+    "depth_anything_v2_vitb.pth",
+    1024
+   ]
+  },
+  {
+   "id": 10,
+   "type": "LiveAvatarPlate",
+   "pos": [
+    40,
+    660
+   ],
+   "size": [
+    320,
+    70
+   ],
+   "flags": {},
+   "order": 9,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "segments",
+     "type": "LIVE_AVATAR_SEGMENTS",
+     "link": 9
+    }
+   ],
+   "outputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "links": [
+      12
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "mask",
+     "type": "MASK",
+     "links": [
+      15
+     ],
+     "slot_index": 1
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LiveAvatarPlate"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 11,
+   "type": "UNETLoader",
+   "pos": [
+    40,
+    780
+   ],
+   "size": [
+    320,
+    90
+   ],
+   "flags": {},
+   "order": 10,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "MODEL",
+     "type": "MODEL",
+     "links": [
+      16,
+      33,
+      46,
+      59,
+      72,
+      85
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "UNETLoader"
+   },
+   "widgets_values": [
+    "anima/anima-aesthetic-v1.1.safetensors",
+    "default"
+   ]
+  },
+  {
+   "id": 12,
+   "type": "CLIPLoader",
+   "pos": [
+    40,
+    910
+   ],
+   "size": [
+    320,
+    110
+   ],
+   "flags": {},
+   "order": 11,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "CLIP",
+     "type": "CLIP",
+     "links": [
+      10,
+      11,
+      24,
+      25,
+      28,
+      41,
+      54,
+      67,
+      80
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CLIPLoader"
+   },
+   "widgets_values": [
+    "qwen_3_06b_base.safetensors",
+    "stable_diffusion",
+    "default"
+   ]
+  },
+  {
+   "id": 13,
+   "type": "VAELoader",
+   "pos": [
+    40,
+    1060
+   ],
+   "size": [
+    320,
+    60
+   ],
+   "flags": {},
+   "order": 12,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "VAE",
+     "type": "VAE",
+     "links": [
+      13,
+      21,
+      30,
+      38,
+      43,
+      51,
+      56,
+      64,
+      69,
+      77,
+      82,
+      90
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "VAELoader"
+   },
+   "widgets_values": [
+    "wan_2.1_vae.safetensors"
+   ]
+  },
+  {
+   "id": 14,
+   "type": "CLIPTextEncode",
+   "pos": [
+    420,
+    660
+   ],
+   "size": [
+    280,
+    130
+   ],
+   "flags": {},
+   "order": 13,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "clip",
+     "type": "CLIP",
+     "link": 10
+    }
+   ],
+   "outputs": [
+    {
+     "name": "CONDITIONING",
+     "type": "CONDITIONING",
+     "links": [
+      17
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CLIPTextEncode"
+   },
+   "widgets_values": [
+    "masterpiece, best quality, score_9, clothes, shirt, jacket, torso, plain shading"
+   ],
+   "title": "Clothes prompt"
+  },
+  {
+   "id": 15,
+   "type": "CLIPTextEncode",
+   "pos": [
+    420,
+    830
+   ],
+   "size": [
+    280,
+    110
+   ],
+   "flags": {},
+   "order": 14,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "clip",
+     "type": "CLIP",
+     "link": 11
+    }
+   ],
+   "outputs": [
+    {
+     "name": "CONDITIONING",
+     "type": "CONDITIONING",
+     "links": [
+      18
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CLIPTextEncode"
+   },
+   "widgets_values": [
+    "worst quality, low quality, score_1, score_2, score_3, blurry, arms, hands, fingers, hair, white, empty, text, watermark"
+   ],
+   "title": "Negative"
+  },
+  {
+   "id": 16,
+   "type": "VAEEncode",
+   "pos": [
+    420,
+    980
+   ],
+   "size": [
+    280,
+    60
+   ],
+   "flags": {},
+   "order": 15,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "pixels",
+     "type": "IMAGE",
+     "link": 12
+    },
+    {
+     "name": "vae",
+     "type": "VAE",
+     "link": 13
+    }
+   ],
+   "outputs": [
+    {
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      14
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "VAEEncode"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 17,
+   "type": "SetLatentNoiseMask",
+   "pos": [
+    420,
+    1080
+   ],
+   "size": [
+    280,
+    60
+   ],
+   "flags": {},
+   "order": 16,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "samples",
+     "type": "LATENT",
+     "link": 14
+    },
+    {
+     "name": "mask",
+     "type": "MASK",
+     "link": 15
+    }
+   ],
+   "outputs": [
+    {
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      19
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "SetLatentNoiseMask"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 18,
+   "type": "KSampler",
+   "pos": [
+    760,
+    600
+   ],
+   "size": [
+    280,
+    270
+   ],
+   "flags": {},
+   "order": 17,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "model",
+     "type": "MODEL",
+     "link": 16
+    },
+    {
+     "name": "positive",
+     "type": "CONDITIONING",
+     "link": 17
+    },
+    {
+     "name": "negative",
+     "type": "CONDITIONING",
+     "link": 18
+    },
+    {
+     "name": "latent_image",
+     "type": "LATENT",
+     "link": 19
+    }
+   ],
+   "outputs": [
+    {
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      20
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "KSampler"
+   },
+   "widgets_values": [
+    42,
+    "fixed",
+    24,
+    4.0,
+    "er_sde",
+    "simple",
+    0.65
+   ]
+  },
+  {
+   "id": 19,
+   "type": "VAEDecode",
+   "pos": [
+    760,
+    910
+   ],
+   "size": [
+    280,
+    60
+   ],
+   "flags": {},
+   "order": 18,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "samples",
+     "type": "LATENT",
+     "link": 20
+    },
+    {
+     "name": "vae",
+     "type": "VAE",
+     "link": 21
+    }
+   ],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      22,
+      23
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "VAEDecode"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 20,
+   "type": "PreviewImage",
+   "pos": [
+    1100,
+    780
+   ],
+   "size": [
+    460,
+    420
+   ],
+   "flags": {},
+   "order": 19,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "link": 22
+    }
+   ],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "PreviewImage"
+   },
+   "widgets_values": [],
+   "title": "Plate"
+  },
+  {
+   "id": 21,
+   "type": "MarkdownNote",
+   "pos": [
+    40,
+    1300
+   ],
+   "size": [
+    700,
+    130
+   ],
+   "flags": {},
+   "order": 20,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "MarkdownNote"
+   },
+   "widgets_values": [
+    "**Drawn variants**\n\nEach column inpaints one variant on the head crop with Anima: closed and smiling eyes, and the a, i and o mouths. Only the masked area is used. Put your character's tags in the prompts, but leave the eye color out of the closed-eye ones or Anima paints the eyes open again. Disconnect a column to skip that variant."
+   ],
+   "title": "Variants"
+  },
+  {
+   "id": 22,
+   "type": "CLIPTextEncode",
+   "pos": [
+    1800,
+    1450
+   ],
+   "size": [
+    330,
+    180
+   ],
+   "flags": {},
+   "order": 21,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "clip",
+     "type": "CLIP",
+     "link": 24
+    }
+   ],
+   "outputs": [
+    {
+     "name": "CONDITIONING",
+     "type": "CONDITIONING",
+     "links": [
+      35,
+      48
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CLIPTextEncode"
+   },
+   "widgets_values": [
+    "worst quality, low quality, score_1, score_2, score_3, blurry, text, watermark, open eyes, pupils, iris, half-closed eyes"
+   ],
+   "title": "Negative eyes"
+  },
+  {
+   "id": 23,
+   "type": "CLIPTextEncode",
+   "pos": [
+    1800,
+    1670
+   ],
+   "size": [
+    330,
+    180
+   ],
+   "flags": {},
+   "order": 22,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "clip",
+     "type": "CLIP",
+     "link": 25
+    }
+   ],
+   "outputs": [
+    {
+     "name": "CONDITIONING",
+     "type": "CONDITIONING",
+     "links": [
+      61,
+      74,
+      87
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CLIPTextEncode"
+   },
+   "widgets_values": [
+    "worst quality, low quality, score_1, score_2, score_3, blurry, text, watermark, closed mouth"
+   ],
+   "title": "Negative mouth"
+  },
+  {
+   "id": 24,
+   "type": "LiveAvatarVariants",
+   "pos": [
+    1800,
+    1910
+   ],
+   "size": [
+    300,
+    200
+   ],
+   "flags": {},
+   "order": 23,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "segments",
+     "type": "LIVE_AVATAR_SEGMENTS",
+     "link": 26
+    },
+    {
+     "name": "eyes_closed",
+     "type": "IMAGE",
+     "link": 39
+    },
+    {
+     "name": "eyes_smile",
+     "type": "IMAGE",
+     "link": 52
+    },
+    {
+     "name": "mouth_a",
+     "type": "IMAGE",
+     "link": 65
+    },
+    {
+     "name": "mouth_i",
+     "type": "IMAGE",
+     "link": 78
+    },
+    {
+     "name": "mouth_o",
+     "type": "IMAGE",
+     "link": 91
+    }
+   ],
+   "outputs": [
+    {
+     "name": "variants",
+     "type": "LIVE_AVATAR_VARIANTS",
+     "links": [
+      92
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LiveAvatarVariants"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 25,
+   "type": "LiveAvatarVariantMask",
+   "pos": [
+    40,
+    1450
+   ],
+   "size": [
+    330,
+    80
+   ],
+   "flags": {},
+   "order": 24,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "segments",
+     "type": "LIVE_AVATAR_SEGMENTS",
+     "link": 27
+    }
+   ],
+   "outputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "links": [
+      29
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "mask",
+     "type": "MASK",
+     "links": [
+      32
+     ],
+     "slot_index": 1
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LiveAvatarVariantMask"
+   },
+   "widgets_values": [
+    "eyes_closed"
+   ]
+  },
+  {
+   "id": 26,
+   "type": "CLIPTextEncode",
+   "pos": [
+    40,
+    1570
+   ],
+   "size": [
+    330,
+    150
+   ],
+   "flags": {},
+   "order": 25,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "clip",
+     "type": "CLIP",
+     "link": 28
+    }
+   ],
+   "outputs": [
+    {
+     "name": "CONDITIONING",
+     "type": "CONDITIONING",
+     "links": [
+      34
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CLIPTextEncode"
+   },
+   "widgets_values": [
+    "masterpiece, best quality, score_9, 1girl, purple hair, cat ears, closed eyes, eyelashes, sleeping, expressionless"
+   ],
+   "title": "eyes_closed"
+  },
+  {
+   "id": 27,
+   "type": "VAEEncode",
+   "pos": [
+    40,
+    1760
+   ],
+   "size": [
+    330,
+    50
+   ],
+   "flags": {},
+   "order": 26,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "pixels",
+     "type": "IMAGE",
+     "link": 29
+    },
+    {
+     "name": "vae",
+     "type": "VAE",
+     "link": 30
+    }
+   ],
+   "outputs": [
+    {
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      31
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "VAEEncode"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 28,
+   "type": "SetLatentNoiseMask",
+   "pos": [
+    40,
+    1850
+   ],
+   "size": [
+    330,
+    50
+   ],
+   "flags": {},
+   "order": 27,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "samples",
+     "type": "LATENT",
+     "link": 31
+    },
+    {
+     "name": "mask",
+     "type": "MASK",
+     "link": 32
+    }
+   ],
+   "outputs": [
+    {
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      36
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "SetLatentNoiseMask"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 29,
+   "type": "KSampler",
+   "pos": [
+    40,
+    1940
+   ],
+   "size": [
+    330,
+    260
+   ],
+   "flags": {},
+   "order": 28,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "model",
+     "type": "MODEL",
+     "link": 33
+    },
+    {
+     "name": "positive",
+     "type": "CONDITIONING",
+     "link": 34
+    },
+    {
+     "name": "negative",
+     "type": "CONDITIONING",
+     "link": 35
+    },
+    {
+     "name": "latent_image",
+     "type": "LATENT",
+     "link": 36
+    }
+   ],
+   "outputs": [
+    {
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      37
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "KSampler"
+   },
+   "widgets_values": [
+    42,
+    "fixed",
+    24,
+    4.0,
+    "er_sde",
+    "simple",
+    0.95
+   ]
+  },
+  {
+   "id": 30,
+   "type": "VAEDecode",
+   "pos": [
+    40,
+    2240
+   ],
+   "size": [
+    330,
+    50
+   ],
+   "flags": {},
+   "order": 29,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "samples",
+     "type": "LATENT",
+     "link": 37
+    },
+    {
+     "name": "vae",
+     "type": "VAE",
+     "link": 38
+    }
+   ],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      39
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "VAEDecode"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 31,
+   "type": "LiveAvatarVariantMask",
+   "pos": [
+    390,
+    1450
+   ],
+   "size": [
+    330,
+    80
+   ],
+   "flags": {},
+   "order": 30,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "segments",
+     "type": "LIVE_AVATAR_SEGMENTS",
+     "link": 40
+    }
+   ],
+   "outputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "links": [
+      42
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "mask",
+     "type": "MASK",
+     "links": [
+      45
+     ],
+     "slot_index": 1
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LiveAvatarVariantMask"
+   },
+   "widgets_values": [
+    "eyes_smile"
+   ]
+  },
+  {
+   "id": 32,
+   "type": "CLIPTextEncode",
+   "pos": [
+    390,
+    1570
+   ],
+   "size": [
+    330,
+    150
+   ],
+   "flags": {},
+   "order": 31,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "clip",
+     "type": "CLIP",
+     "link": 41
+    }
+   ],
+   "outputs": [
+    {
+     "name": "CONDITIONING",
+     "type": "CONDITIONING",
+     "links": [
+      47
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CLIPTextEncode"
+   },
+   "widgets_values": [
+    "masterpiece, best quality, score_9, 1girl, purple hair, cat ears, closed eyes, ^_^, happy, smile"
+   ],
+   "title": "eyes_smile"
+  },
+  {
+   "id": 33,
+   "type": "VAEEncode",
+   "pos": [
+    390,
+    1760
+   ],
+   "size": [
+    330,
+    50
+   ],
+   "flags": {},
+   "order": 32,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "pixels",
+     "type": "IMAGE",
+     "link": 42
+    },
+    {
+     "name": "vae",
+     "type": "VAE",
+     "link": 43
+    }
+   ],
+   "outputs": [
+    {
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      44
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "VAEEncode"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 34,
+   "type": "SetLatentNoiseMask",
+   "pos": [
+    390,
+    1850
+   ],
+   "size": [
+    330,
+    50
+   ],
+   "flags": {},
+   "order": 33,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "samples",
+     "type": "LATENT",
+     "link": 44
+    },
+    {
+     "name": "mask",
+     "type": "MASK",
+     "link": 45
+    }
+   ],
+   "outputs": [
+    {
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      49
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "SetLatentNoiseMask"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 35,
+   "type": "KSampler",
+   "pos": [
+    390,
+    1940
+   ],
+   "size": [
+    330,
+    260
+   ],
+   "flags": {},
+   "order": 34,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "model",
+     "type": "MODEL",
+     "link": 46
+    },
+    {
+     "name": "positive",
+     "type": "CONDITIONING",
+     "link": 47
+    },
+    {
+     "name": "negative",
+     "type": "CONDITIONING",
+     "link": 48
+    },
+    {
+     "name": "latent_image",
+     "type": "LATENT",
+     "link": 49
+    }
+   ],
+   "outputs": [
+    {
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      50
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "KSampler"
+   },
+   "widgets_values": [
+    42,
+    "fixed",
+    24,
+    4.0,
+    "er_sde",
+    "simple",
+    0.85
+   ]
+  },
+  {
+   "id": 36,
+   "type": "VAEDecode",
+   "pos": [
+    390,
+    2240
+   ],
+   "size": [
+    330,
+    50
+   ],
+   "flags": {},
+   "order": 35,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "samples",
+     "type": "LATENT",
+     "link": 50
+    },
+    {
+     "name": "vae",
+     "type": "VAE",
+     "link": 51
+    }
+   ],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      52
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "VAEDecode"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 37,
+   "type": "LiveAvatarVariantMask",
+   "pos": [
+    740,
+    1450
+   ],
+   "size": [
+    330,
+    80
+   ],
+   "flags": {},
+   "order": 36,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "segments",
+     "type": "LIVE_AVATAR_SEGMENTS",
+     "link": 53
+    }
+   ],
+   "outputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "links": [
+      55
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "mask",
+     "type": "MASK",
+     "links": [
+      58
+     ],
+     "slot_index": 1
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LiveAvatarVariantMask"
+   },
+   "widgets_values": [
+    "mouth_a"
+   ]
+  },
+  {
+   "id": 38,
+   "type": "CLIPTextEncode",
+   "pos": [
+    740,
+    1570
+   ],
+   "size": [
+    330,
+    150
+   ],
+   "flags": {},
+   "order": 37,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "clip",
+     "type": "CLIP",
+     "link": 54
+    }
+   ],
+   "outputs": [
+    {
+     "name": "CONDITIONING",
+     "type": "CONDITIONING",
+     "links": [
+      60
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CLIPTextEncode"
+   },
+   "widgets_values": [
+    "masterpiece, best quality, score_9, 1girl, purple hair, cat ears, pink eyes, open mouth, wide open mouth, talking"
+   ],
+   "title": "mouth_a"
+  },
+  {
+   "id": 39,
+   "type": "VAEEncode",
+   "pos": [
+    740,
+    1760
+   ],
+   "size": [
+    330,
+    50
+   ],
+   "flags": {},
+   "order": 38,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "pixels",
+     "type": "IMAGE",
+     "link": 55
+    },
+    {
+     "name": "vae",
+     "type": "VAE",
+     "link": 56
+    }
+   ],
+   "outputs": [
+    {
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      57
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "VAEEncode"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 40,
+   "type": "SetLatentNoiseMask",
+   "pos": [
+    740,
+    1850
+   ],
+   "size": [
+    330,
+    50
+   ],
+   "flags": {},
+   "order": 39,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "samples",
+     "type": "LATENT",
+     "link": 57
+    },
+    {
+     "name": "mask",
+     "type": "MASK",
+     "link": 58
+    }
+   ],
+   "outputs": [
+    {
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      62
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "SetLatentNoiseMask"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 41,
+   "type": "KSampler",
+   "pos": [
+    740,
+    1940
+   ],
+   "size": [
+    330,
+    260
+   ],
+   "flags": {},
+   "order": 40,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "model",
+     "type": "MODEL",
+     "link": 59
+    },
+    {
+     "name": "positive",
+     "type": "CONDITIONING",
+     "link": 60
+    },
+    {
+     "name": "negative",
+     "type": "CONDITIONING",
+     "link": 61
+    },
+    {
+     "name": "latent_image",
+     "type": "LATENT",
+     "link": 62
+    }
+   ],
+   "outputs": [
+    {
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      63
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "KSampler"
+   },
+   "widgets_values": [
+    42,
+    "fixed",
+    24,
+    4.0,
+    "er_sde",
+    "simple",
+    0.8
+   ]
+  },
+  {
+   "id": 42,
+   "type": "VAEDecode",
+   "pos": [
+    740,
+    2240
+   ],
+   "size": [
+    330,
+    50
+   ],
+   "flags": {},
+   "order": 41,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "samples",
+     "type": "LATENT",
+     "link": 63
+    },
+    {
+     "name": "vae",
+     "type": "VAE",
+     "link": 64
+    }
+   ],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      65
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "VAEDecode"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 43,
+   "type": "LiveAvatarVariantMask",
+   "pos": [
+    1090,
+    1450
+   ],
+   "size": [
+    330,
+    80
+   ],
+   "flags": {},
+   "order": 42,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "segments",
+     "type": "LIVE_AVATAR_SEGMENTS",
+     "link": 66
+    }
+   ],
+   "outputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "links": [
+      68
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "mask",
+     "type": "MASK",
+     "links": [
+      71
+     ],
+     "slot_index": 1
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LiveAvatarVariantMask"
+   },
+   "widgets_values": [
+    "mouth_i"
+   ]
+  },
+  {
+   "id": 44,
+   "type": "CLIPTextEncode",
+   "pos": [
+    1090,
+    1570
+   ],
+   "size": [
+    330,
+    150
+   ],
+   "flags": {},
+   "order": 43,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "clip",
+     "type": "CLIP",
+     "link": 67
+    }
+   ],
+   "outputs": [
+    {
+     "name": "CONDITIONING",
+     "type": "CONDITIONING",
+     "links": [
+      73
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CLIPTextEncode"
+   },
+   "widgets_values": [
+    "masterpiece, best quality, score_9, 1girl, purple hair, cat ears, pink eyes, grin, teeth, parted lips, talking"
+   ],
+   "title": "mouth_i"
+  },
+  {
+   "id": 45,
+   "type": "VAEEncode",
+   "pos": [
+    1090,
+    1760
+   ],
+   "size": [
+    330,
+    50
+   ],
+   "flags": {},
+   "order": 44,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "pixels",
+     "type": "IMAGE",
+     "link": 68
+    },
+    {
+     "name": "vae",
+     "type": "VAE",
+     "link": 69
+    }
+   ],
+   "outputs": [
+    {
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      70
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "VAEEncode"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 46,
+   "type": "SetLatentNoiseMask",
+   "pos": [
+    1090,
+    1850
+   ],
+   "size": [
+    330,
+    50
+   ],
+   "flags": {},
+   "order": 45,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "samples",
+     "type": "LATENT",
+     "link": 70
+    },
+    {
+     "name": "mask",
+     "type": "MASK",
+     "link": 71
+    }
+   ],
+   "outputs": [
+    {
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      75
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "SetLatentNoiseMask"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 47,
+   "type": "KSampler",
+   "pos": [
+    1090,
+    1940
+   ],
+   "size": [
+    330,
+    260
+   ],
+   "flags": {},
+   "order": 46,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "model",
+     "type": "MODEL",
+     "link": 72
+    },
+    {
+     "name": "positive",
+     "type": "CONDITIONING",
+     "link": 73
+    },
+    {
+     "name": "negative",
+     "type": "CONDITIONING",
+     "link": 74
+    },
+    {
+     "name": "latent_image",
+     "type": "LATENT",
+     "link": 75
+    }
+   ],
+   "outputs": [
+    {
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      76
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "KSampler"
+   },
+   "widgets_values": [
+    42,
+    "fixed",
+    24,
+    4.0,
+    "er_sde",
+    "simple",
+    0.8
+   ]
+  },
+  {
+   "id": 48,
+   "type": "VAEDecode",
+   "pos": [
+    1090,
+    2240
+   ],
+   "size": [
+    330,
+    50
+   ],
+   "flags": {},
+   "order": 47,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "samples",
+     "type": "LATENT",
+     "link": 76
+    },
+    {
+     "name": "vae",
+     "type": "VAE",
+     "link": 77
+    }
+   ],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      78
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "VAEDecode"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 49,
+   "type": "LiveAvatarVariantMask",
+   "pos": [
+    1440,
+    1450
+   ],
+   "size": [
+    330,
+    80
+   ],
+   "flags": {},
+   "order": 48,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "segments",
+     "type": "LIVE_AVATAR_SEGMENTS",
+     "link": 79
+    }
+   ],
+   "outputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "links": [
+      81
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "mask",
+     "type": "MASK",
+     "links": [
+      84
+     ],
+     "slot_index": 1
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LiveAvatarVariantMask"
+   },
+   "widgets_values": [
+    "mouth_o"
+   ]
+  },
+  {
+   "id": 50,
+   "type": "CLIPTextEncode",
+   "pos": [
+    1440,
+    1570
+   ],
+   "size": [
+    330,
+    150
+   ],
+   "flags": {},
+   "order": 49,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "clip",
+     "type": "CLIP",
+     "link": 80
+    }
+   ],
+   "outputs": [
+    {
+     "name": "CONDITIONING",
+     "type": "CONDITIONING",
+     "links": [
+      86
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CLIPTextEncode"
+   },
+   "widgets_values": [
+    "masterpiece, best quality, score_9, 1girl, purple hair, cat ears, pink eyes, :o, open mouth, small round mouth, talking"
+   ],
+   "title": "mouth_o"
+  },
+  {
+   "id": 51,
+   "type": "VAEEncode",
+   "pos": [
+    1440,
+    1760
+   ],
+   "size": [
+    330,
+    50
+   ],
+   "flags": {},
+   "order": 50,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "pixels",
+     "type": "IMAGE",
+     "link": 81
+    },
+    {
+     "name": "vae",
+     "type": "VAE",
+     "link": 82
+    }
+   ],
+   "outputs": [
+    {
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      83
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "VAEEncode"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 52,
+   "type": "SetLatentNoiseMask",
+   "pos": [
+    1440,
+    1850
+   ],
+   "size": [
+    330,
+    50
+   ],
+   "flags": {},
+   "order": 51,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "samples",
+     "type": "LATENT",
+     "link": 83
+    },
+    {
+     "name": "mask",
+     "type": "MASK",
+     "link": 84
+    }
+   ],
+   "outputs": [
+    {
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      88
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "SetLatentNoiseMask"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 53,
+   "type": "KSampler",
+   "pos": [
+    1440,
+    1940
+   ],
+   "size": [
+    330,
+    260
+   ],
+   "flags": {},
+   "order": 52,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "model",
+     "type": "MODEL",
+     "link": 85
+    },
+    {
+     "name": "positive",
+     "type": "CONDITIONING",
+     "link": 86
+    },
+    {
+     "name": "negative",
+     "type": "CONDITIONING",
+     "link": 87
+    },
+    {
+     "name": "latent_image",
+     "type": "LATENT",
+     "link": 88
+    }
+   ],
+   "outputs": [
+    {
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      89
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "KSampler"
+   },
+   "widgets_values": [
+    42,
+    "fixed",
+    24,
+    4.0,
+    "er_sde",
+    "simple",
+    0.8
+   ]
+  },
+  {
+   "id": 54,
+   "type": "VAEDecode",
+   "pos": [
+    1440,
+    2240
+   ],
+   "size": [
+    330,
+    50
+   ],
+   "flags": {},
+   "order": 53,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "samples",
+     "type": "LATENT",
+     "link": 89
+    },
+    {
+     "name": "vae",
+     "type": "VAE",
+     "link": 90
+    }
+   ],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      91
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "VAEDecode"
+   },
+   "widgets_values": []
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   0,
+   3,
+   0,
+   "CLIP"
+  ],
+  [
+   2,
+   1,
+   0,
+   3,
+   1,
+   "IMAGE"
+  ],
+  [
+   3,
+   3,
+   1,
+   4,
+   0,
+   "IMAGE"
+  ],
+  [
+   4,
+   3,
+   0,
+   5,
+   0,
+   "LIVE_AVATAR_SEGMENTS"
+  ],
+  [
+   5,
+   5,
+   0,
+   6,
+   0,
+   "LIVE_AVATAR"
+  ],
+  [
+   6,
+   5,
+   0,
+   7,
+   0,
+   "LIVE_AVATAR"
+  ],
+  [
+   7,
+   1,
+   0,
+   9,
+   0,
+   "IMAGE"
+  ],
+  [
+   8,
+   9,
+   0,
+   5,
+   2,
+   "IMAGE"
+  ],
+  [
+   9,
+   3,
+   0,
+   10,
+   0,
+   "LIVE_AVATAR_SEGMENTS"
+  ],
+  [
+   10,
+   12,
+   0,
+   14,
+   0,
+   "CLIP"
+  ],
+  [
+   11,
+   12,
+   0,
+   15,
+   0,
+   "CLIP"
+  ],
+  [
+   12,
+   10,
+   0,
+   16,
+   0,
+   "IMAGE"
+  ],
+  [
+   13,
+   13,
+   0,
+   16,
+   1,
+   "VAE"
+  ],
+  [
+   14,
+   16,
+   0,
+   17,
+   0,
+   "LATENT"
+  ],
+  [
+   15,
+   10,
+   1,
+   17,
+   1,
+   "MASK"
+  ],
+  [
+   16,
+   11,
+   0,
+   18,
+   0,
+   "MODEL"
+  ],
+  [
+   17,
+   14,
+   0,
+   18,
+   1,
+   "CONDITIONING"
+  ],
+  [
+   18,
+   15,
+   0,
+   18,
+   2,
+   "CONDITIONING"
+  ],
+  [
+   19,
+   17,
+   0,
+   18,
+   3,
+   "LATENT"
+  ],
+  [
+   20,
+   18,
+   0,
+   19,
+   0,
+   "LATENT"
+  ],
+  [
+   21,
+   13,
+   0,
+   19,
+   1,
+   "VAE"
+  ],
+  [
+   22,
+   19,
+   0,
+   20,
+   0,
+   "IMAGE"
+  ],
+  [
+   23,
+   19,
+   0,
+   5,
+   3,
+   "IMAGE"
+  ],
+  [
+   24,
+   12,
+   0,
+   22,
+   0,
+   "CLIP"
+  ],
+  [
+   25,
+   12,
+   0,
+   23,
+   0,
+   "CLIP"
+  ],
+  [
+   26,
+   3,
+   0,
+   24,
+   0,
+   "LIVE_AVATAR_SEGMENTS"
+  ],
+  [
+   27,
+   3,
+   0,
+   25,
+   0,
+   "LIVE_AVATAR_SEGMENTS"
+  ],
+  [
+   28,
+   12,
+   0,
+   26,
+   0,
+   "CLIP"
+  ],
+  [
+   29,
+   25,
+   0,
+   27,
+   0,
+   "IMAGE"
+  ],
+  [
+   30,
+   13,
+   0,
+   27,
+   1,
+   "VAE"
+  ],
+  [
+   31,
+   27,
+   0,
+   28,
+   0,
+   "LATENT"
+  ],
+  [
+   32,
+   25,
+   1,
+   28,
+   1,
+   "MASK"
+  ],
+  [
+   33,
+   11,
+   0,
+   29,
+   0,
+   "MODEL"
+  ],
+  [
+   34,
+   26,
+   0,
+   29,
+   1,
+   "CONDITIONING"
+  ],
+  [
+   35,
+   22,
+   0,
+   29,
+   2,
+   "CONDITIONING"
+  ],
+  [
+   36,
+   28,
+   0,
+   29,
+   3,
+   "LATENT"
+  ],
+  [
+   37,
+   29,
+   0,
+   30,
+   0,
+   "LATENT"
+  ],
+  [
+   38,
+   13,
+   0,
+   30,
+   1,
+   "VAE"
+  ],
+  [
+   39,
+   30,
+   0,
+   24,
+   1,
+   "IMAGE"
+  ],
+  [
+   40,
+   3,
+   0,
+   31,
+   0,
+   "LIVE_AVATAR_SEGMENTS"
+  ],
+  [
+   41,
+   12,
+   0,
+   32,
+   0,
+   "CLIP"
+  ],
+  [
+   42,
+   31,
+   0,
+   33,
+   0,
+   "IMAGE"
+  ],
+  [
+   43,
+   13,
+   0,
+   33,
+   1,
+   "VAE"
+  ],
+  [
+   44,
+   33,
+   0,
+   34,
+   0,
+   "LATENT"
+  ],
+  [
+   45,
+   31,
+   1,
+   34,
+   1,
+   "MASK"
+  ],
+  [
+   46,
+   11,
+   0,
+   35,
+   0,
+   "MODEL"
+  ],
+  [
+   47,
+   32,
+   0,
+   35,
+   1,
+   "CONDITIONING"
+  ],
+  [
+   48,
+   22,
+   0,
+   35,
+   2,
+   "CONDITIONING"
+  ],
+  [
+   49,
+   34,
+   0,
+   35,
+   3,
+   "LATENT"
+  ],
+  [
+   50,
+   35,
+   0,
+   36,
+   0,
+   "LATENT"
+  ],
+  [
+   51,
+   13,
+   0,
+   36,
+   1,
+   "VAE"
+  ],
+  [
+   52,
+   36,
+   0,
+   24,
+   2,
+   "IMAGE"
+  ],
+  [
+   53,
+   3,
+   0,
+   37,
+   0,
+   "LIVE_AVATAR_SEGMENTS"
+  ],
+  [
+   54,
+   12,
+   0,
+   38,
+   0,
+   "CLIP"
+  ],
+  [
+   55,
+   37,
+   0,
+   39,
+   0,
+   "IMAGE"
+  ],
+  [
+   56,
+   13,
+   0,
+   39,
+   1,
+   "VAE"
+  ],
+  [
+   57,
+   39,
+   0,
+   40,
+   0,
+   "LATENT"
+  ],
+  [
+   58,
+   37,
+   1,
+   40,
+   1,
+   "MASK"
+  ],
+  [
+   59,
+   11,
+   0,
+   41,
+   0,
+   "MODEL"
+  ],
+  [
+   60,
+   38,
+   0,
+   41,
+   1,
+   "CONDITIONING"
+  ],
+  [
+   61,
+   23,
+   0,
+   41,
+   2,
+   "CONDITIONING"
+  ],
+  [
+   62,
+   40,
+   0,
+   41,
+   3,
+   "LATENT"
+  ],
+  [
+   63,
+   41,
+   0,
+   42,
+   0,
+   "LATENT"
+  ],
+  [
+   64,
+   13,
+   0,
+   42,
+   1,
+   "VAE"
+  ],
+  [
+   65,
+   42,
+   0,
+   24,
+   3,
+   "IMAGE"
+  ],
+  [
+   66,
+   3,
+   0,
+   43,
+   0,
+   "LIVE_AVATAR_SEGMENTS"
+  ],
+  [
+   67,
+   12,
+   0,
+   44,
+   0,
+   "CLIP"
+  ],
+  [
+   68,
+   43,
+   0,
+   45,
+   0,
+   "IMAGE"
+  ],
+  [
+   69,
+   13,
+   0,
+   45,
+   1,
+   "VAE"
+  ],
+  [
+   70,
+   45,
+   0,
+   46,
+   0,
+   "LATENT"
+  ],
+  [
+   71,
+   43,
+   1,
+   46,
+   1,
+   "MASK"
+  ],
+  [
+   72,
+   11,
+   0,
+   47,
+   0,
+   "MODEL"
+  ],
+  [
+   73,
+   44,
+   0,
+   47,
+   1,
+   "CONDITIONING"
+  ],
+  [
+   74,
+   23,
+   0,
+   47,
+   2,
+   "CONDITIONING"
+  ],
+  [
+   75,
+   46,
+   0,
+   47,
+   3,
+   "LATENT"
+  ],
+  [
+   76,
+   47,
+   0,
+   48,
+   0,
+   "LATENT"
+  ],
+  [
+   77,
+   13,
+   0,
+   48,
+   1,
+   "VAE"
+  ],
+  [
+   78,
+   48,
+   0,
+   24,
+   4,
+   "IMAGE"
+  ],
+  [
+   79,
+   3,
+   0,
+   49,
+   0,
+   "LIVE_AVATAR_SEGMENTS"
+  ],
+  [
+   80,
+   12,
+   0,
+   50,
+   0,
+   "CLIP"
+  ],
+  [
+   81,
+   49,
+   0,
+   51,
+   0,
+   "IMAGE"
+  ],
+  [
+   82,
+   13,
+   0,
+   51,
+   1,
+   "VAE"
+  ],
+  [
+   83,
+   51,
+   0,
+   52,
+   0,
+   "LATENT"
+  ],
+  [
+   84,
+   49,
+   1,
+   52,
+   1,
+   "MASK"
+  ],
+  [
+   85,
+   11,
+   0,
+   53,
+   0,
+   "MODEL"
+  ],
+  [
+   86,
+   50,
+   0,
+   53,
+   1,
+   "CONDITIONING"
+  ],
+  [
+   87,
+   23,
+   0,
+   53,
+   2,
+   "CONDITIONING"
+  ],
+  [
+   88,
+   52,
+   0,
+   53,
+   3,
+   "LATENT"
+  ],
+  [
+   89,
+   53,
+   0,
+   54,
+   0,
+   "LATENT"
+  ],
+  [
+   90,
+   13,
+   0,
+   54,
+   1,
+   "VAE"
+  ],
+  [
+   91,
+   54,
+   0,
+   24,
+   5,
+   "IMAGE"
+  ],
+  [
+   92,
+   24,
+   0,
+   5,
+   5,
+   "LIVE_AVATAR_VARIANTS"
+  ]
+ ],
+ "groups": [],
+ "config": {},
+ "extra": {
+  "ds": {
+   "scale": 0.8,
+   "offset": [
+    40,
+    40
+   ]
+  }
+ },
+ "version": 0.4
+}

@@ -2,6 +2,10 @@
 import math
 
 LOCK_BONES = 4
+# Drawn variants fade in over the morphed layers: [part, value where it starts, value where it is opaque].
+FADES = {"blinkL": [("closed_l", 0.5, 0.85)], "blinkR": [("closed_r", 0.5, 0.85)],
+         "eyeSmile": [("smile_l", 0.25, 0.75), ("smile_r", 0.25, 0.75)],
+         "vowelA": [("mouth_a", 0.15, 0.6)], "vowelI": [("mouth_i", 0.15, 0.6)], "vowelO": [("mouth_o", 0.15, 0.6)]}
 
 
 def build_params(bones, parts, face_unit, wide_turn):
@@ -42,8 +46,28 @@ def build_params(bones, parts, face_unit, wide_turn):
         for morph in part["morphs"]:
             morphs.setdefault(morph, []).append(name)
     for morph, names in morphs.items():
-        params[morph] = {"morphs": names}
+        params.setdefault(morph, {})["morphs"] = names
+    for param, fades in FADES.items():
+        fades = [[part, start, end] for part, start, end in fades if part in parts]
+        if fades:
+            params.setdefault(param, {})["fades"] = fades
     return params
+
+
+def build_expressions(params):
+    """Held faces for setExpression, from the params this avatar has. Drawn smiling eyes and mouths stand in for morphs when present."""
+    smile_eyes = {"eyeSmile": 1.0} if "eyeSmile" in params else {"blinkL": 0.35, "blinkR": 0.35}
+    round_mouth = {"vowelO": 0.8} if "vowelO" in params else {"mouthOpen": 0.5}
+    faces = {
+        "smile": {"mouthSmile": 1.0, "browL": 0.25, "browR": 0.25, **smile_eyes},
+        "surprise": {"browL": 1.0, "browR": 1.0, **round_mouth},
+        "angry": {"browL": -1.0, "browR": -1.0, "mouthSmile": -0.7, "blinkL": 0.25, "blinkR": 0.25},
+        "sad": {"browL": 0.4, "browR": 0.4, "mouthSmile": -0.9, "blinkL": 0.3, "blinkR": 0.3, "headPitch": 0.2},
+        "wink": {"blinkL": 1.0, "mouthSmile": 0.6, "headRoll": 0.15},
+        "sleepy": {"blinkL": 0.5, "blinkR": 0.5, "headRoll": 0.1},
+        "shy": {"mouthSmile": 0.4, "blinkL": 0.2, "blinkR": 0.2, "headPitch": 0.25, "headRoll": 0.15, "gazeX": -0.5},
+    }
+    return {name: {p: v for p, v in face.items() if p in params} for name, face in faces.items()}
 
 
 def _track(param, *keys):
@@ -78,7 +102,7 @@ def build_clips(params):
     clips["nod"] = clip(1.3, False, _track("headPitch", (0, 0), (0.2, 0.75), (0.45, -0.1), (0.7, 0.6), (1.0, -0.05), (1.3, 0)))
     clips["shake"] = clip(1.4, False, _track("headYaw", (0, 0), (0.2, 0.7), (0.5, -0.7), (0.8, 0.6), (1.1, -0.4), (1.4, 0)))
     clips["happy"] = clip(1.6, False, _track("bounce", (0, 0), (0.15, -0.25), (0.35, 0.85), (0.55, -0.2), (0.75, 0.6), (0.95, -0.1), (1.2, 0)),
-                          _track("mouthSmile", (0, 0), (0.2, 1), (1.3, 1), (1.6, 0)), _track("mouthOpen", (0, 0), (0.2, 0.5), (1.2, 0.5), (1.5, 0)),
+                          _track("mouthSmile", (0, 0), (0.2, 1), (1.3, 1), (1.6, 0)), _track("eyeSmile", (0, 0), (0.2, 1), (1.3, 1), (1.6, 0)), _track("mouthOpen", (0, 0), (0.2, 0.5), (1.2, 0.5), (1.5, 0)),
                           _track("armLRaise", (0, 0), (0.35, 0.28), (1.2, 0.22), (1.6, 0)), _track("armRRaise", (0, 0), (0.35, 0.28), (1.2, 0.22), (1.6, 0)),
                           _track("browL", (0, 0), (0.3, 1), (1.3, 1), (1.6, 0)), _track("browR", (0, 0), (0.3, 1), (1.3, 1), (1.6, 0)))
     clips["think"] = clip(3.0, False, _track("headRoll", (0, 0), (0.5, 0.55), (2.5, 0.5), (3.0, 0)), _track("headYaw", (0, 0), (0.5, 0.3), (2.5, 0.3), (3.0, 0)),

@@ -18,6 +18,7 @@ export class FaceTracker {
   constructor(landmarker) {
     this.landmarker = landmarker;
     this.state = {};
+    this.vowel = "a";
   }
 
   // Maps one frame to avatar params, mirrored so the avatar behaves like a mirror. Returns null without a face.
@@ -44,6 +45,10 @@ export class FaceTracker {
       gazeY: clamp((b.eyeLookUpLeft + b.eyeLookUpRight - b.eyeLookDownLeft - b.eyeLookDownRight) * 0.6),
     };
     for (const name in target) this.state[name] = (this.state[name] ?? 0) + (target[name] - (this.state[name] ?? 0)) * SMOOTH;
+    // Rounded lips read as o, stretched lips over a small jaw as i, the rest as a.
+    const round = b.mouthFunnel + b.mouthPucker;
+    const wide = (b.mouthStretchLeft + b.mouthStretchRight) / 2 + (b.mouthSmileLeft + b.mouthSmileRight) * 0.25;
+    this.vowel = round > 0.35 ? "o" : wide > 0.3 && b.jawOpen < 0.35 ? "i" : "a";
     return this.state;
   }
 

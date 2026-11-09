@@ -1,14 +1,31 @@
 // Runtime for .lav avatars. The WebGLRenderer must be created with { stencil: true }: eyelids clip the iris with it.
 import * as THREE from "three";
+import { speechClip } from "./speech.mjs";
 
 const decoder = new TextDecoder();
 const FADE = 0.25;
 const SPLAT_IN = THREE.MathUtils.degToRad(8);
 const SPLAT_FULL = THREE.MathUtils.degToRad(18);
 const LAYERS_OUT = THREE.MathUtils.degToRad(30);
-// Turns add up along the spine. Past these limits the eye layers would leave the face, so the head gives way.
+// Turns add up along the spine. Flat layers shear when turned far, so the head stops early and the eyes carry the rest of the look.
 const MAX_TURN = THREE.MathUtils.degToRad(40);
-const MAX_TURN_FLAT = THREE.MathUtils.degToRad(34);
+const MAX_TURN_FLAT = THREE.MathUtils.degToRad(22);
+// Looking up opens a gap under the chin sooner than looking down. rotation.x is negative looking up.
+const MAX_UP = THREE.MathUtils.degToRad(10);
+const MAX_DOWN = THREE.MathUtils.degToRad(18);
+const MAX_PITCH_SPLAT = THREE.MathUtils.degToRad(30);
+// Drawn mouths standing in for each vowel, best first. Without any, the morph mouth opens by MOUTH_OPEN.
+const DRAWN_MOUTH = { a: ["vowelA", "vowelO", "vowelI"], i: ["vowelI", "vowelA"], u: ["vowelO", "vowelA"], e: ["vowelI", "vowelA"], o: ["vowelO", "vowelA"] };
+const MOUTH_OPEN = { a: 1, i: 0.45, u: 0.5, e: 0.7, o: 0.8 };
+
+// Shading from the normal atlas. Normals follow the bones through the skin matrix; the light stays in world space.
+const LIGHT_VERTEX = ["#include <skinnormal_vertex>", "#include <skinnormal_vertex>\n  vLightRot = mat3(modelMatrix) * mat3(skinMatrix);"];
+const LIGHT_FRAGMENT = ["#include <map_fragment>", `#include <map_fragment>
+  if (lavLight > 0.0) {
+    vec3 n = normalize(vLightRot * (texture(lavNormals, vMapUv).xyz * 2.0 - 1.0));
+    float lit = smoothstep(-0.3, 0.45, dot(n, lavLightDir));
+    diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * mix(lavShadow, lavLightColor, lit), lavLight);
+  }`];
 
 export function parseHeader(buffer) {
   const view = new DataView(buffer);
@@ -22,13 +39,15 @@ function smooth(t) {
   return t * t * (3 - 2 * t);
 }
 
-function sample(keys, time) {
+// Dense tracks (captured motion, speech) interpolate linearly: easing every key would stutter.
+function sample(keys, time, linear) {
   if (time <= keys[0][0]) return keys[0][1];
   for (let i = 1; i < keys.length; i++) {
     if (time <= keys[i][0]) {
       const [t0, v0] = keys[i - 1];
       const [t1, v1] = keys[i];
-      return v0 + (v1 - v0) * smooth((time - t0) / Math.max(t1 - t0, 1e-5));
+      const t = (time - t0) / Math.max(t1 - t0, 1e-5);
+      return v0 + (v1 - v0) * (linear ? t : smooth(t));
     }
   }
   return keys[keys.length - 1][1];
@@ -47,7 +66,12 @@ export class LiveAvatar extends THREE.Group {
     const [offset, length] = header.atlas.section;
     const blob = new Blob([new Uint8Array(buffer, base + offset, length)], { type: header.atlas.mime });
     const bitmap = await createImageBitmap(blob, { premultiplyAlpha: "none", colorSpaceConversion: "none" });
-    const avatar = new LiveAvatar(header, buffer, base, bitmap);
+    let normals = null;
+    if (header.atlas.normals) {
+      const [o, n] = header.atlas.normals;
+      normals = await createImageBitmap(new Blob([new Uint8Array(buffer, base + o, n)], { type: header.atlas.mime }), { premultiplyAlpha: "none", colorSpaceConversion: "none" });
+    }
+    const avatar = new LiveAvatar(header, buffer, base, bitmap, normals);
     if (header.headSplat) await avatar.attachHeadSplat(renderer, new Uint8Array(buffer, base + header.headSplat.section[0], header.headSplat.section[1]));
     return avatar;
   }
@@ -67,20 +91,28 @@ export class LiveAvatar extends THREE.Group {
     this.headFade = fade.filter((name) => this.meshes[name]).map((name) => this.meshes[name]);
   }
 
-  // Total yaw of the head seen from the front.
-  headTurn() {
-    return ["spine", "chest", "neck", "head"].reduce((sum, name) => sum + this.boneByName[name].rotation.y, 0);
+  // Total yaw ("y") or pitch ("x") of the head seen from the front.
+  headTurn(axis = "y") {
+    return ["spine", "chest", "neck", "head"].reduce((sum, name) => sum + this.boneByName[name].rotation[axis], 0);
   }
 
-  // Past 70% of the limit the head eases toward it, so it never stops dead.
-  limitHeadTurn() {
-    const limit = this.headSplat ? MAX_TURN : MAX_TURN_FLAT;
+  // Past 70% of the limit the head eases toward it, so it never stops dead. Returns the share of the limit held back.
+  limitHead(axis, limit) {
     const knee = limit * 0.7;
-    const turn = this.headTurn();
+    const turn = this.headTurn(axis);
     const size = Math.abs(turn);
-    if (size <= knee) return;
+    if (size <= knee) return 0;
     const eased = knee + (limit - knee) * Math.tanh((size - knee) / (limit - knee));
-    this.boneByName.head.rotation.y -= Math.sign(turn) * (size - eased);
+    this.boneByName.head.rotation[axis] -= Math.sign(turn) * (size - eased);
+    return (Math.sign(turn) * (size - eased)) / limit;
+  }
+
+  // What the head holds back, the eyes carry: gaze param plus the held share, kept within -1..1.
+  carryGaze(param, held, values) {
+    if (!held || !this.params[param]) return;
+    const gaze = Math.min(Math.max(values[param] ?? 0, -1), 1);
+    const extra = Math.min(Math.max(gaze + held * 2, -1), 1) - gaze;
+    for (const { bone, channel, scale } of this.params[param].drivers) this.drive(this.boneByName[bone], channel, extra * scale);
   }
 
   // The splat rises under the layers from SPLAT_IN to SPLAT_FULL. The layers fade over it from halfway up until LAYERS_OUT.
@@ -96,11 +128,14 @@ export class LiveAvatar extends THREE.Group {
     for (const mesh of this.headFade) mesh.material.opacity = layers;
   }
 
-  constructor(header, buffer, base, bitmap) {
+  constructor(header, buffer, base, bitmap, normals) {
     super();
     this.header = header;
     this.values = {};
     this.actions = [];
+    this.expressions = header.expressions ?? {};
+    this.face = {};
+    this.expression = null;
     this.autoBlink = true;
     this.nextBlink = 2;
     this.blinkTime = -1;
@@ -116,6 +151,16 @@ export class LiveAvatar extends THREE.Group {
     texture.anisotropy = 4;
     texture.needsUpdate = true;
     this.texture = texture;
+    this.normalTexture = normals ? new THREE.Texture(normals) : null;
+    if (this.normalTexture) {
+      this.normalTexture.flipY = false;
+      this.normalTexture.needsUpdate = true;
+    }
+    this.light = {
+      lavLight: { value: 0 }, lavLightDir: { value: new THREE.Vector3(0.4, 0.5, 0.8).normalize() },
+      lavLightColor: { value: new THREE.Color(1.05, 1.03, 1.0) }, lavShadow: { value: new THREE.Color(0.62, 0.58, 0.74) },
+      lavNormals: { value: this.normalTexture },
+    };
 
     this.bones = header.bones.map((b) => {
       const bone = new THREE.Bone();
@@ -154,6 +199,15 @@ export class LiveAvatar extends THREE.Group {
         });
       }
       const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthTest: false, depthWrite: false, side: THREE.DoubleSide });
+      if (this.normalTexture) {
+        material.onBeforeCompile = (shader) => {
+          Object.assign(shader.uniforms, this.light);
+          shader.vertexShader = "varying mat3 vLightRot;\n" + shader.vertexShader.replace(...LIGHT_VERTEX);
+          shader.fragmentShader = "uniform sampler2D lavNormals; uniform float lavLight; uniform vec3 lavLightDir, lavLightColor, lavShadow;\nvarying mat3 vLightRot;\n"
+            + shader.fragmentShader.replace(...LIGHT_FRAGMENT);
+        };
+        material.customProgramCacheKey = () => "lav-light";
+      }
       const side = part.name.endsWith("_l") ? 1 : 2;
       if (part.name.startsWith("eye_")) {
         material.alphaTest = 0.5;
@@ -185,6 +239,40 @@ export class LiveAvatar extends THREE.Group {
     this.values[name] = value;
   }
 
+  // x and y in -1..1 of where the light comes from, y up. strength 0 turns shading off.
+  setLight({ x = 0.4, y = 0.5, strength = 0.8, color, shadow } = {}) {
+    this.light.lavLightDir.value.set(x, y, 1).normalize();
+    this.light.lavLight.value = this.normalTexture ? strength : 0;
+    if (color) this.light.lavLightColor.value.set(color);
+    if (shadow) this.light.lavShadow.value.set(shadow);
+  }
+
+  // Holds a face from avatar.expressions over the params; null goes back to neutral.
+  setExpression(name, fade = 0.3) {
+    if (name && !this.expressions[name]) throw new Error(`Unknown expression ${name}`);
+    this.expression = { from: { ...this.face }, to: name ? this.expressions[name] : {}, time: 0, fade };
+  }
+
+  // Param values for a mouth shape: level 0..1, vowel a, i, u, e or o. Drawn mouths replace the morph when the avatar has them.
+  mouthValues(level, vowel = "a") {
+    const drawn = DRAWN_MOUTH[vowel].find((name) => this.params[name]);
+    const values = { mouthOpen: drawn ? 0 : level * MOUTH_OPEN[vowel] };
+    for (const name of ["vowelA", "vowelI", "vowelO"]) if (this.params[name]) values[name] = name === drawn ? level : 0;
+    return values;
+  }
+
+  setMouth(level, vowel = "a") {
+    Object.assign(this.values, this.mouthValues(level, vowel));
+  }
+
+  // Lip sync from text: kana, or Latin letters as in Spanish or English. Returns the duration in seconds.
+  speak(text, { rate = 8 } = {}) {
+    const clip = speechClip(text, (level, vowel) => this.mouthValues(level, vowel), rate);
+    this.actions = this.actions.filter((l) => l.name !== "speech");
+    this.actions.push({ name: "speech", clip, time: 0, loop: false, weight: 1, fade: 0.05, stopping: false });
+    return clip.duration;
+  }
+
   // loop defaults to the clip's own setting. Clips add on top of each other and of setParam values.
   play(name, { loop, fade = FADE } = {}) {
     const clip = this.clips[name];
@@ -199,8 +287,8 @@ export class LiveAvatar extends THREE.Group {
 
   // x and y in -1..1 of where to look, y up.
   lookAt(x, y) {
-    this.values.headYaw = x * 0.8;
-    this.values.headPitch = -y * 0.6;
+    this.values.headYaw = x * 0.5;
+    this.values.headPitch = -y * 0.45;
     this.values.gazeX = x;
     this.values.gazeY = y;
   }
@@ -214,10 +302,20 @@ export class LiveAvatar extends THREE.Group {
       layer.weight = layer.stopping ? Math.max(layer.weight - rate, 0) : Math.min(layer.weight + rate, 1);
       const time = layer.loop ? layer.time % layer.clip.duration : layer.time;
       for (const track of layer.clip.tracks) {
-        values[track.param] = (values[track.param] ?? 0) + sample(track.keys, time) * layer.weight;
+        values[track.param] = (values[track.param] ?? 0) + sample(track.keys, time, track.linear) * layer.weight;
       }
     }
     this.actions = this.actions.filter((l) => (l.loop || l.time < l.clip.duration) && !(l.stopping && l.weight === 0));
+
+    if (this.expression) {
+      const { from, to, fade } = this.expression;
+      this.expression.time += dt;
+      const k = smooth(Math.min(this.expression.time / Math.max(fade, 1e-3), 1));
+      this.face = {};
+      for (const name of new Set([...Object.keys(from), ...Object.keys(to)])) this.face[name] = (from[name] ?? 0) + ((to[name] ?? 0) - (from[name] ?? 0)) * k;
+      if (k === 1) this.expression = null;
+    }
+    for (const name in this.face) values[name] = (values[name] ?? 0) + this.face[name];
 
     if (this.autoBlink) {
       if (this.time > this.nextBlink) {
@@ -239,8 +337,12 @@ export class LiveAvatar extends THREE.Group {
       bone.rotation.set(0, 0, 0);
       bone.scale.set(1, 1, 1);
     });
+    const opacity = {};
     for (const [name, param] of Object.entries(this.params)) {
       const value = values[name] ?? 0;
+      for (const [part, start, end] of param.fades ?? []) {
+        opacity[part] = Math.max(opacity[part] ?? 0, smooth(Math.min(Math.max((value - start) / (end - start), 0), 1)));
+      }
       if (param.drivers) {
         for (const { bone, channel, scale } of param.drivers) this.drive(this.boneByName[bone], channel, value * scale);
       }
@@ -251,7 +353,14 @@ export class LiveAvatar extends THREE.Group {
         }
       }
     }
-    this.limitHeadTurn();
+    for (const [part, o] of Object.entries(opacity)) {
+      this.meshes[part].material.opacity = o;
+      this.meshes[part].visible = o > 0.003;
+    }
+    this.carryGaze("gazeX", this.limitHead("y", this.headSplat ? MAX_TURN : MAX_TURN_FLAT), values);
+    const up = this.headTurn("x") < 0;
+    // gazeY is positive looking up, while rotation.x is negative there.
+    this.carryGaze("gazeY", -this.limitHead("x", this.headSplat ? MAX_PITCH_SPLAT : up ? MAX_UP : MAX_DOWN), values);
     if (this.headSplat) this.blendHead();
     this.updateSprings(dt);
   }
@@ -299,6 +408,7 @@ export class LiveAvatar extends THREE.Group {
       mesh.material.dispose();
     }
     this.texture.dispose();
+    this.normalTexture?.dispose();
     this.skeleton.dispose();
   }
 }

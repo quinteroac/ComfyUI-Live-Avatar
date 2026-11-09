@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 from scipy import ndimage
 
-from .clips import LOCK_BONES, build_clips, build_params, build_springs
+from .clips import LOCK_BONES, build_clips, build_expressions, build_params, build_springs
 
 SH_C0 = 0.28209479177387814
 BACK_DEPTH = 0.6
@@ -13,10 +13,12 @@ PRIORITY = ["iris_l", "iris_r", "lash_l", "lash_r", "eye_l", "eye_r", "brow_l", 
             "animal_ear_l", "animal_ear_r", "hair", "face", "neck", "arm_l", "arm_r", "tail", "skirt", "leg_l", "leg_r"]
 # Back to front.
 DRAW_ORDER = ["hair_fill", "tail", "leg_r", "leg_l", "torso", "skirt", "neck", "arm_r", "arm_l", "lock_r", "lock_l", "hair_back", "animal_ear_r", "animal_ear_l", "face",
-              "mouth_inner", "mouth_up", "mouth_low", "eye_r", "eye_l", "iris_r", "iris_l", "lash_r", "lash_l",
-              "brow_r", "brow_l", "hair_top", "bangs"]
-HEAD_LAYERS = {"face", "mouth_inner", "mouth_up", "mouth_low", "eye_r", "eye_l", "iris_r", "iris_l", "lash_r", "lash_l",
-               "brow_r", "brow_l", "hair_top", "bangs", "hair_fill", "hair_back"}
+              "mouth_inner", "mouth_up", "mouth_low", "mouth_a", "mouth_i", "mouth_o", "eye_r", "eye_l", "iris_r", "iris_l", "lash_r", "lash_l",
+              "closed_r", "closed_l", "smile_r", "smile_l", "brow_r", "brow_l", "hair_top", "bangs"]
+HEAD_LAYERS = {"face", "mouth_inner", "mouth_up", "mouth_low", "mouth_a", "mouth_i", "mouth_o", "eye_r", "eye_l", "iris_r", "iris_l", "lash_r", "lash_l",
+               "closed_r", "closed_l", "smile_r", "smile_l", "brow_r", "brow_l", "hair_top", "bangs", "hair_fill", "hair_back"}
+# Drawn variants become these layers; eye variants split into the character's left and right.
+VARIANT_LAYERS = {"eyes_closed": "closed", "eyes_smile": "smile", "mouth_a": "mouth_a", "mouth_i": "mouth_i", "mouth_o": "mouth_o"}
 # See-through tags holding the hidden pixels of each layer, first tag on top.
 SEETHROUGH_LAYERS = {"face": ["face"], "neck": ["neck"], "torso": ["topwear"], "skirt": ["bottomwear"], "leg_l": ["legwear"], "leg_r": ["legwear"],
                      "arm_l": ["handwear-l", "handwear"], "arm_r": ["handwear-r", "handwear"], "hair_fill": ["back hair"]}
@@ -566,7 +568,8 @@ def head_depth(xy, ellipse, offset):
 
 
 LAYER_DEPTH = {"face": 0.0, "eye_l": 0.0, "eye_r": 0.0, "iris_l": 0.01, "iris_r": 0.01, "lash_l": 0.04, "lash_r": 0.04, "brow_l": 0.05, "brow_r": 0.05,
-               "mouth_inner": -0.01, "mouth_up": 0.02, "mouth_low": 0.02, "hair_top": 0.06, "bangs": 0.14, "hair_fill": -0.3, "lock_l": 0.06, "lock_r": 0.06, "hair_back": 0.0}
+               "mouth_inner": -0.01, "mouth_up": 0.02, "mouth_low": 0.02, "mouth_a": 0.025, "mouth_i": 0.025, "mouth_o": 0.025,
+               "closed_l": 0.045, "closed_r": 0.045, "smile_l": 0.045, "smile_r": 0.045, "hair_top": 0.06, "bangs": 0.14, "hair_fill": -0.3, "lock_l": 0.06, "lock_r": 0.06, "hair_back": 0.0}
 
 
 class HeadSplat:
@@ -779,28 +782,32 @@ def build_parts(layers, skeleton, relief=None, splat=None):
         vertices, triangles = grid_mesh(rgba[..., 3] > 0, int(step))
         segments, blend = _layer_segments(name, skeleton)
         bones, weights = skin(vertices, segments, max(blend * face_h, 1.0))
+        # Depth over the part's whole tile: vertices sample it, and the encoder turns it into the normal map.
+        bx0, by0 = vertices.min(0).astype(int)
+        bx1, by1 = vertices.max(0).astype(int) + 1
+        px = np.clip(np.arange(bx0, bx1), 0, layers.width - 1)
+        py = np.clip(np.arange(by0, by1), 0, layers.height - 1)
         if name in LAYER_DEPTH and splat is not None:
-            px = np.clip(vertices[:, 0].astype(int), 0, layers.width - 1)
-            py = np.clip(vertices[:, 1].astype(int), 0, layers.height - 1)
             # Hair follows a soft version: the surface steps at the hairline and would fold its mesh.
             surface = splat.soft if name in ("hair_top", "bangs", "hair_back") else splat.depth
-            z = surface[py, px] + LAYER_DEPTH[name] * ellipse[2] * (name != "hair_fill")
+            field = surface[np.ix_(py, px)] + LAYER_DEPTH[name] * ellipse[2] * (name != "hair_fill")
             if name.startswith("lock_"):
                 # Strands hang at the sides of the head; the surface under the chin would throw them across the face.
-                z = np.minimum(z, ellipse[2] * 0.3)
+                field = np.minimum(field, ellipse[2] * 0.3)
         elif name in LAYER_DEPTH:
-            z = head_depth(vertices, ellipse, LAYER_DEPTH[name])
+            grid = np.stack(np.meshgrid(np.arange(bx0, bx1), np.arange(by0, by1)), -1).reshape(-1, 2).astype(np.float32)
+            field = head_depth(grid, ellipse, LAYER_DEPTH[name]).reshape(len(py), len(px))
         else:
             mask = cv2.GaussianBlur((rgba[..., 3] > 0).astype(np.float32), (0, 0), 2)
             dt = cv2.GaussianBlur(cv2.distanceTransform((mask > 0.5).astype(np.uint8), cv2.DIST_L2, 5), (0, 0), 3)
-            px = np.clip(vertices[:, 0].astype(int), 0, layers.width - 1)
-            py = np.clip(vertices[:, 1].astype(int), 0, layers.height - 1)
-            z = np.minimum(dt[py, px], face_w * 0.6) * 0.6
+            field = np.minimum(dt[np.ix_(py, px)], face_w * 0.6) * 0.6
             if name.startswith("arm_"):
-                z += face_w * 0.1
+                field += face_w * 0.1
         if relief is not None:
-            z = z + relief[np.clip(vertices[:, 1].astype(int), 0, layers.height - 1), np.clip(vertices[:, 0].astype(int), 0, layers.width - 1)]
-        parts[name] = {"rgba": rgba, "vertices": vertices, "triangles": triangles, "z": z.astype(np.float32),
+            field = field + relief[np.ix_(py, px)]
+        field = field.astype(np.float32)
+        z = field[vertices[:, 1].astype(int) - by0, vertices[:, 0].astype(int) - bx0]
+        parts[name] = {"rgba": rgba, "vertices": vertices, "triangles": triangles, "z": z, "depth": field,
                        "bones": bones, "weights": weights, "morphs": {}}
     _add_mouth(layers, skeleton, parts, ellipse, splat)
     _add_face_morphs(layers, parts)
@@ -934,10 +941,26 @@ def _hand_hair_to_splat(layers):
         layers.layers.pop(name, None)
 
 
-def build_avatar(seg, hidden=None, depth=None, plate=None, head_splat=None, splat_hair=False):
-    """head_splat: positions, scales, rotations (wxyz), opacities and sh arrays of a splat of the head alone."""
+def _add_variants(layers, variants):
+    columns = np.arange(layers.width)[None, :]
+    for variant, rgba in variants.items():
+        name = VARIANT_LAYERS[variant]
+        if not variant.startswith("eyes_"):
+            layers.layers[name] = rgba
+            continue
+        for side, keep in (("l", columns >= layers.center_x), ("r", columns < layers.center_x)):
+            half = rgba.copy()
+            half[..., 3] = np.where(keep, half[..., 3], 0)
+            if half[..., 3].any():
+                layers.layers[name + "_" + side] = half
+
+
+def build_avatar(seg, hidden=None, depth=None, plate=None, head_splat=None, splat_hair=False, variants=None):
+    """head_splat: positions, scales, rotations (wxyz), opacities and sh arrays of a splat of the head alone.
+    variants: full-canvas RGBA patches keyed by VARIANT_LAYERS."""
     layers = Layers(seg, hidden, plate)
     layers.build()
+    _add_variants(layers, variants or {})
     splat = None if head_splat is None else HeadSplat(layers, *head_splat)
     if splat is not None and splat_hair:
         _hand_hair_to_splat(layers)
@@ -946,4 +969,4 @@ def build_avatar(seg, hidden=None, depth=None, plate=None, head_splat=None, spla
     face_unit = (layers.face_box[2] - layers.face_box[0]) / layers.height
     params = build_params(skeleton.index, parts, face_unit, splat is not None)
     return {"width": layers.width, "height": layers.height, "bones": skeleton.bones, "parts": parts, "params": params,
-            "clips": build_clips(params), "springs": build_springs(skeleton.index), "face_box": [int(v) for v in layers.face_box], "head_splat": splat, "splat_hair": splat_hair}
+            "clips": build_clips(params), "expressions": build_expressions(params), "springs": build_springs(skeleton.index), "face_box": [int(v) for v in layers.face_box], "head_splat": splat, "splat_hair": splat_hair}
