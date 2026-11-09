@@ -570,13 +570,16 @@ def _layer_segments(name, skeleton):
     return [(index["head"], skeleton.xy("head"), skeleton.xy("head"))], 1.0
 
 
-def head_depth(xy, ellipse, offset):
+def head_depth(xy, ellipse, height):
+    """Front of the head in pixels: a wide bell with gentle slopes everywhere. A round dome is steep at the eyes and squeezes the far one when the head turns."""
     cx, cy, rx, ry = ellipse
     u, v = (xy[:, 0] - cx) / rx, (xy[:, 1] - cy) / ry
-    r2 = u * u + v * v
-    return (np.clip(1 - r2, 0, 1) * 0.8 + offset) * rx
+    return (np.clip(1 - u * u, 0, 1) * np.clip(1 - v * v, 0, 1)) ** 2 * height
 
 
+# Head depth at the nose in face widths, and the skull's half width in widths of the face layer.
+HEAD_DEPTH = 0.4
+HEAD_REACH = 0.9
 LAYER_DEPTH = {"face": 0.0, "eye_l": 0.0, "eye_r": 0.0, "iris_l": 0.01, "iris_r": 0.01, "lash_l": 0.04, "lash_r": 0.04, "brow_l": 0.05, "brow_r": 0.05,
                "mouth_inner": -0.01, "mouth_up": 0.02, "mouth_low": 0.02, "mouth_a": 0.025, "mouth_i": 0.025, "mouth_o": 0.025,
                "closed_l": 0.045, "closed_r": 0.045, "smile_l": 0.045, "smile_r": 0.045, "hair_top": 0.06, "bangs": 0.14, "hair_fill": -0.3, "lock_l": 0.06, "lock_r": 0.06, "hair_back": 0.0}
@@ -752,35 +755,32 @@ def _head_pixels(layers):
 
 
 def _relief(depth, layers):
-    """Depth detail in pixels, per form. Monocular depth jumps between parts, and those jumps would tear the meshes."""
+    """Depth detail in pixels for each body layer, taken from that form alone: monocular depth jumps between parts, and those jumps would tear the meshes.
+    The head and its hair get none. They share one surface, and detail of their own pulls skin and hair apart when the head turns."""
     face_w = layers.face_box[2] - layers.face_box[0]
     low, high = np.percentile(depth[layers.alpha > 0.5], [2, 98])
     near = np.clip((depth - low) / max(high - low, 1e-5), 0, 1)
-    groups = {"hair": ("hair_top", "bangs", "lock_l", "lock_r")}
-    groups["skin"] = tuple(name for name in HEAD_LAYERS if name not in groups["hair"])
-    groups.update({name: (name,) for name in layers.visible if name not in HEAD_LAYERS and name not in groups["hair"]})
-    relief = np.zeros(depth.shape, np.float32)
-    for names in groups.values():
-        solid = np.zeros(depth.shape, np.float32)
-        for name in names:
-            if name in layers.visible:
-                solid[layers.visible[name]] = 1
-        if not solid.any():
+    relief = {}
+    for name, visible in layers.visible.items():
+        if name in HEAD_LAYERS or name.startswith("lock_") or not visible.any():
             continue
+        solid = visible.astype(np.float32)
 
         def blur(sigma):
             return cv2.GaussianBlur(near * solid, (0, 0), sigma) / np.maximum(cv2.GaussianBlur(solid, (0, 0), sigma), 1e-3)
 
-        detail = blur(face_w * 0.04) - blur(face_w * 0.4)
-        # Spreads past the form so hidden vertices of the layer get it too.
-        relief = np.where(_dilate(solid > 0, int(face_w * 0.1)), detail, relief)
-    return np.clip(relief, -0.06, 0.06) * face_w
+        # Detail finer than the coarse grid would alias into saw teeth along the layer's edge.
+        relief[name] = np.clip(blur(face_w * 0.1) - blur(face_w * 0.4), -0.06, 0.06) * face_w
+    return relief
 
 
 def build_parts(layers, skeleton, relief=None, splat=None):
     x0, y0, x1, y1 = layers.face_box
     face_w, face_h = x1 - x0, y1 - y0
-    ellipse = (layers.center_x, y0 + face_h * 0.5, face_w * 0.56, face_h * 0.62)
+    # The face matte stops at the hair, so the skull is sized from the face layer, which reaches under it.
+    hx0, _, hx1, _ = _bbox(layers.layers["face"][..., 3] > 0)
+    ellipse = ((hx0 + hx1) / 2, y0 + face_h * 0.5, (hx1 - hx0) * HEAD_REACH, face_h * 0.8)
+    unit = face_w * 0.56
     coarse = max(layers.height // 90, 6)
     fine = max(face_w // 22, 2)
     parts = {}
@@ -802,26 +802,26 @@ def build_parts(layers, skeleton, relief=None, splat=None):
         if name in LAYER_DEPTH and splat is not None:
             # Hair follows a soft version: the surface steps at the hairline and would fold its mesh.
             surface = splat.soft if name in ("hair_top", "bangs", "hair_back") else splat.depth
-            field = surface[np.ix_(py, px)] + LAYER_DEPTH[name] * ellipse[2] * (name != "hair_fill")
+            field = surface[np.ix_(py, px)] + LAYER_DEPTH[name] * unit * (name != "hair_fill")
             if name.startswith("lock_"):
                 # Strands hang at the sides of the head; the surface under the chin would throw them across the face.
-                field = np.minimum(field, ellipse[2] * 0.3)
+                field = np.minimum(field, unit * 0.3)
         elif name in LAYER_DEPTH:
             grid = np.stack(np.meshgrid(np.arange(bx0, bx1), np.arange(by0, by1)), -1).reshape(-1, 2).astype(np.float32)
-            field = head_depth(grid, ellipse, LAYER_DEPTH[name]).reshape(len(py), len(px))
+            field = head_depth(grid, ellipse, face_w * HEAD_DEPTH).reshape(len(py), len(px)) + LAYER_DEPTH[name] * unit
         else:
             mask = cv2.GaussianBlur((rgba[..., 3] > 0).astype(np.float32), (0, 0), 2)
             dt = cv2.GaussianBlur(cv2.distanceTransform((mask > 0.5).astype(np.uint8), cv2.DIST_L2, 5), (0, 0), 3)
             field = np.minimum(dt[np.ix_(py, px)], face_w * 0.6) * 0.6
             if name.startswith("arm_"):
                 field += face_w * 0.1
-        if relief is not None:
-            field = field + relief[np.ix_(py, px)]
+        if relief is not None and name in relief:
+            field = field + relief[name][np.ix_(py, px)]
         field = field.astype(np.float32)
         z = field[vertices[:, 1].astype(int) - by0, vertices[:, 0].astype(int) - bx0]
         parts[name] = {"rgba": rgba, "vertices": vertices, "triangles": triangles, "z": z, "depth": field,
                        "bones": bones, "weights": weights, "morphs": {}}
-    _add_mouth(layers, skeleton, parts, ellipse, splat)
+    _add_mouth(layers, skeleton, parts, ellipse, unit, splat)
     _add_face_morphs(layers, parts)
     return {name: parts[name] for name in DRAW_ORDER if name in parts}
 
@@ -841,7 +841,7 @@ def _soft_chest(layers, skeleton, vertices, bones, weights):
     weights /= weights.sum(1, keepdims=True)
 
 
-def _add_mouth(layers, skeleton, parts, ellipse, splat):
+def _add_mouth(layers, skeleton, parts, ellipse, unit, splat):
     if layers.mouth_curve is None:
         return
     x0, y0, x1, y1 = layers.mouth_box
@@ -877,7 +877,7 @@ def _add_mouth(layers, skeleton, parts, ellipse, splat):
     weights = np.zeros((len(vertices), 4), np.float32)
     weights[:, 0] = 1
     parts["mouth_inner"] = {"texture": texture, "uv": uv, "vertices": vertices, "triangles": np.array(triangles, np.uint32),
-                            "z": _mouth_depth(vertices, layers, ellipse, splat),
+                            "z": _mouth_depth(vertices, layers, ellipse, unit, splat),
                             "bones": bones, "weights": weights, "morphs": {"mouthOpen": open_delta}}
     for name, share in (("mouth_up", -0.25), ("mouth_low", 1.0)):
         if name in parts:
@@ -896,10 +896,12 @@ def _add_mouth(layers, skeleton, parts, ellipse, splat):
             parts[name]["morphs"]["mouthSmile"] = delta
 
 
-def _mouth_depth(vertices, layers, ellipse, splat):
+def _mouth_depth(vertices, layers, ellipse, unit, splat):
+    offset = LAYER_DEPTH["mouth_inner"] * unit
     if splat is None:
-        return head_depth(vertices, ellipse, LAYER_DEPTH["mouth_inner"]).astype(np.float32)
-    return splat.depth[vertices[:, 1].astype(int), vertices[:, 0].astype(int)] + LAYER_DEPTH["mouth_inner"] * ellipse[2]
+        face_w = layers.face_box[2] - layers.face_box[0]
+        return (head_depth(vertices, ellipse, face_w * HEAD_DEPTH) + offset).astype(np.float32)
+    return splat.depth[vertices[:, 1].astype(int), vertices[:, 0].astype(int)] + offset
 
 
 def _add_face_morphs(layers, parts):
