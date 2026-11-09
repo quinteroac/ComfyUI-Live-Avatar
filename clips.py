@@ -8,7 +8,8 @@ FADES = {"blinkL": [("closed_l", 0.5, 0.85)], "blinkR": [("closed_r", 0.5, 0.85)
          "vowelA": [("mouth_a", 0.15, 0.6)], "vowelI": [("mouth_i", 0.15, 0.6)], "vowelO": [("mouth_o", 0.15, 0.6)]}
 
 
-def build_params(bones, parts, face_unit, wide_turn):
+def build_params(bones, parts, gaze, wide_turn):
+    """gaze: how far the irises travel sideways, in world units."""
     params = {}
 
     def bone_param(name, drivers):
@@ -37,8 +38,8 @@ def build_params(bones, parts, face_unit, wide_turn):
         bone_param("leg" + side + "Swing", [("thigh_" + s, "rx", -0.8)])
         bone_param("leg" + side + "Bend", [("shin_" + s, "rx", 1.2)])
         bone_param("ear" + side, [("animal_ear_" + s, "rz", 0.35 * sign)])
-    bone_param("gazeX", [("iris_l", "px", face_unit * 0.07), ("iris_r", "px", face_unit * 0.07)])
-    bone_param("gazeY", [("iris_l", "py", face_unit * 0.035), ("iris_r", "py", face_unit * 0.035)])
+    bone_param("gazeX", [("iris_l", "px", gaze), ("iris_r", "px", gaze)])
+    bone_param("gazeY", [("iris_l", "py", gaze * 0.5), ("iris_r", "py", gaze * 0.5)])
     bone_param("tail", [("tail_0", "rz", 0.5), ("tail_1", "rz", 0.3)])
 
     morphs = {}

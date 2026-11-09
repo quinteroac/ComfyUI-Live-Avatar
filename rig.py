@@ -205,16 +205,18 @@ class Layers:
 
     def _split_face_parts(self):
         self.skin = np.median(self.rgb[self.visible["face"]], axis=0)
+        dark = self.rgb.astype(np.float32).sum(2) < self.skin.sum() * 0.75
+        rows = np.arange(self.height)[:, None]
         for side in SIDES:
             brow = self.visible.get("brow_" + side)
             if brow is None:
                 continue
             # Under bangs the brow matte also catches blush and skin, and brows never fade out.
-            dark = brow & (self.rgb.astype(np.float32).sum(2) < self.skin.sum() * 0.75)
-            if dark.sum() >= brow.sum() * 0.3:
-                dark = _largest(dark)
-                self.visible["face"] |= brow & ~dark
-                self.visible["brow_" + side] = dark
+            hairs = brow & dark
+            if hairs.sum() >= brow.sum() * 0.3:
+                hairs = _largest(hairs)
+                self.visible["face"] |= brow & ~hairs
+                self.visible["brow_" + side] = hairs
         # One moving iris next to a painted one looks worse than eyes that keep still.
         if "iris_l" not in self.visible or "iris_r" not in self.visible:
             for side in SIDES:
@@ -226,16 +228,24 @@ class Layers:
             if lash in self.visible and eye in self.visible:
                 pool = self.visible[eye] | self.visible[lash] | self.visible.get(iris, False)
                 mid = (_bbox(pool)[1] + _bbox(pool)[3]) / 2
-                lower = self.visible[lash] & (np.arange(self.height)[:, None] > mid)
-                self.visible[lash] &= ~lower
-                self.visible[eye] |= lower
+                # The lash matte covers the whole upper eye. Only its dark pixels above the middle are the lashes that blink:
+                # the white left in it would move with them and cover the iris.
+                count, labels, _, centroids = cv2.connectedComponentsWithStats((self.visible[lash] & dark).astype(np.uint8))
+                upper = np.isin(labels, [i for i in range(1, count) if centroids[i][1] <= mid])
+                if upper.sum() < self.visible[lash].sum() * 0.2:
+                    upper = self.visible[lash] & (rows <= mid)
+                columns = np.nonzero(upper.any(0))[0]
+                underside = np.interp(np.arange(self.width), columns, self.height - 1 - np.argmax(upper[::-1, columns], axis=0))
+                rest = self.visible[lash] & ~upper
+                self.visible[eye] |= rest & (rows > underside)
+                self.visible["face"] |= rest & (rows <= underside)
+                self.visible[lash] = upper
         mouth = self.visible.pop("mouth", None)
         self.mouth_curve = None
         if mouth is not None and mouth.any():
             ys, xs = np.nonzero(mouth)
             self.mouth_curve = np.polyfit(xs, ys, 2)
             line = np.polyval(self.mouth_curve, np.arange(self.width))[None, :]
-            rows = np.arange(self.height)[:, None]
             self.visible["mouth_up"] = mouth & (rows <= line)
             self.visible["mouth_low"] = mouth & (rows > line)
             self.mouth_box = _bbox(mouth)
@@ -354,29 +364,34 @@ class Layers:
         v = self.visible
         if eye not in v:
             return
-        pool = v[eye] | v.get(iris, False) | v.get(lash, False)
-        # The eye only exists where the drawing shows it: painted under bangs it would appear when they fade.
-        shape = _hull(pool) & ~(v.get("hair_top", False) | v.get("bangs", False))
+        # The eye only exists where the drawing shows it: painted under bangs it would appear when they fade, and over skin it would cover it.
+        shape = _hull(v[eye] | v.get(iris, False)) & ~(v.get("hair_top", False) | v.get("bangs", False) | v["face"])
         white = v[eye]
         # Small anime eyes may show no clean white at all, so the brightest texels only tint a near-white base.
         bright = self.rgb[white].astype(np.float32)
         sclera = np.array([238, 238, 244], np.float32)
+        rim = np.zeros(self.label.shape, bool)
         if len(bright):
             top = bright[bright.sum(1) >= np.percentile(bright.sum(1), 90)].mean(0)
             sclera = sclera * 0.75 + top * 0.25
+            if iris in v and v[iris].any():
+                # The iris matte stops short of its outline. Left on the white, the outline stays behind when the eye looks aside.
+                rim = _dilate(v[iris], max(round(v[iris].sum() ** 0.5 * 0.08), 2)) & white & (np.abs(self.rgb - top).sum(2) > 60)
+                white = white & ~rim
         rgba = np.zeros((self.height, self.width, 4), np.uint8)
         rgba[..., :3][shape] = sclera.astype(np.uint8)
         rgba[..., :3][white] = self.rgb[white]
-        rgba[..., 3][shape] = 255
+        rgba[..., :3][rim] = _nearest_fill(self.rgb, white, rim)[rim]
+        rgba[..., 3][shape | v[eye]] = 255
         self.layers[eye] = rgba
         if iris in v and v[iris].any():
             ring = np.zeros(self.label.shape, np.uint8)
             points = cv2.findNonZero(v[iris].astype(np.uint8))
             (cx, cy), radius = cv2.minEnclosingCircle(points)
             cv2.circle(ring, (round(cx), round(cy)), round(radius), 1, -1)
-            rgb = _nearest_fill(self.rgb, v[iris], ring > 0)
+            rgb = _nearest_fill(self.rgb, v[iris] | rim, ring > 0)
             # The ring only adds what is hidden: over the drawn eye it would repaint it.
-            rgba = np.dstack([rgb, ((ring > 0) & ~v[eye]).astype(np.uint8) * 255])
+            rgba = np.dstack([rgb, (((ring > 0) & ~white) | rim).astype(np.uint8) * 255])
             self.layers[iris] = rgba
         if lash in v:
             self.add(lash, erode_source=0, blur=0)
@@ -1002,7 +1017,9 @@ def build_avatar(seg, hidden=None, depth=None, plate=None, head_splat=None, spla
         _hand_hair_to_splat(layers)
     skeleton = build_skeleton(layers, seg["joints"])
     parts = build_parts(layers, skeleton, None if depth is None else _relief(depth, layers), splat)
-    face_unit = (layers.face_box[2] - layers.face_box[0]) / layers.height
-    params = build_params(skeleton.index, parts, face_unit, splat is not None)
+    # The eyes look aside by a share of the iris: measured on the face, small eyes would roll out of sight.
+    irises = [_bbox(layers.visible[name])[2] - _bbox(layers.visible[name])[0] for name in ("iris_l", "iris_r") if name in layers.layers]
+    gaze = float(np.mean(irises)) * 0.32 / layers.height if irises else 0.0
+    params = build_params(skeleton.index, parts, gaze, splat is not None)
     return {"width": layers.width, "height": layers.height, "bones": skeleton.bones, "parts": parts, "params": params,
             "clips": build_clips(params), "expressions": build_expressions(params), "springs": build_springs(skeleton.index, _chest_reach(layers), chest_physics), "face_box": [int(v) for v in layers.face_box], "head_splat": splat, "splat_hair": splat_hair}
