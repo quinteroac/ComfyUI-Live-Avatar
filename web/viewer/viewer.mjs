@@ -17,6 +17,7 @@ let tracking = null;
 let focus = query.get("frame") ?? "body";
 let follow = query.get("look") !== "0";
 const pointer = { x: 0, y: 0, sx: 0, sy: 0 };
+let dragging = false;
 const light = { on: query.has("light"), x: 0.4, y: 0.5, strength: 0.8 };
 if (light.on) [light.x, light.y, light.strength = 0.8] = query.get("light").split(",").map(Number);
 
@@ -188,13 +189,20 @@ addEventListener("resize", () => frame());
 addEventListener("pointermove", (e) => {
   pointer.x = (e.clientX / innerWidth) * 2 - 1;
   pointer.y = 1 - (e.clientY / innerHeight) * 2;
-  // Dragging over the avatar moves the light while it is on.
-  if (light.on && e.buttons === 1 && e.target === renderer.domElement && avatar) {
+  dragging = e.buttons === 1 && e.target === renderer.domElement && !!avatar;
+  if (!dragging) return;
+  // Dragging over the avatar moves the light while it is on. Otherwise it moves the avatar, to see hair and chest follow.
+  if (light.on) {
     light.x = pointer.x * 1.5;
     light.y = pointer.y * 1.5;
     applyLight();
+  } else {
+    const unit = (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.position.z) / innerHeight;
+    avatar.position.x += e.movementX * unit;
+    avatar.position.y -= e.movementY * unit;
   }
 });
+addEventListener("pointerup", () => { dragging = false; });
 addEventListener("keydown", (e) => {
   const b = document.querySelectorAll("#faces button")[+e.key - 1];
   if (b && !e.ctrlKey && !e.metaKey && !e.altKey) b.click();
@@ -218,6 +226,7 @@ function tick() {
   }
   if (tracking) trackFace();
   if (mouth) micLevel();
+  if (!dragging) avatar.position.multiplyScalar(Math.exp(-dt * 5));
   avatar.update(dt);
   renderer.render(scene, camera);
 }

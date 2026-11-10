@@ -190,15 +190,28 @@ class Layers:
             return
         rows = np.arange(self.height)[:, None]
         cols = np.arange(self.width)[None, :]
+        if "bangs" in self.visible:
+            # The bangs matte can take in the whole head of hair; bangs only cover the forehead.
+            forehead = np.abs(cols - self.center_x) < (x1 - x0) * 0.62
+            hair = hair | (self.visible["bangs"] & ~forehead)
+            self.visible["bangs"] &= forehead
         # The hair matte can swallow the neck, and no hair hangs in front of it right under the chin.
         throat = hair & (rows > self.chin_y) & (rows <= self.hair_cut) & (np.abs(cols - self.center_x) < (x1 - x0) * 0.28)
         if "neck" in self.visible:
             self.visible["neck"] |= throat
             hair = hair & ~throat
-        self.visible["hair_top"] = hair & (rows <= self.hair_cut)
-        below = hair & (rows > self.hair_cut)
-        self.visible["lock_l"] = below & (cols >= self.center_x)
-        self.visible["lock_r"] = below & (cols < self.center_x)
+        loose = hair & (rows > self.hair_cut)
+        eyes = [sum(self.visible.get(part + side, False) for part in ("eye_", "iris_", "lash_")) for side in SIDES]
+        if all(np.any(eye) for eye in eyes):
+            # Hair standing out from the head hangs free too, like tails tied at its sides. The eyes size the head: hair hides how wide the face is.
+            (ly, lx), (ry, rx) = (np.argwhere(eye).mean(0) for eye in eyes)
+            apart = np.hypot(lx - rx, ly - ry)
+            away = ((cols - (lx + rx) / 2) / (apart * 1.35)) ** 2 + ((rows - (ly + ry) / 2 + apart * 0.3) / (apart * 1.9)) ** 2 > 1
+            count, labels, stats, _ = cv2.connectedComponentsWithStats((hair & away).astype(np.uint8))
+            loose |= np.isin(labels, [i for i in range(1, count) if stats[i, cv2.CC_STAT_AREA] > apart * apart * 0.25])
+        self.visible["hair_top"] = hair & ~loose
+        self.visible["lock_l"] = loose & (cols >= self.center_x)
+        self.visible["lock_r"] = loose & (cols < self.center_x)
         for name in ("lock_l", "lock_r"):
             if self.visible[name].sum() < 40:
                 self.visible["hair_top"] |= self.visible.pop(name)
@@ -525,7 +538,10 @@ def build_skeleton(layers, joints):
             skeleton.add(ear, "head", ((box[0] + box[2]) / 2, box[3]))
         lock = "lock_" + side
         if lock in layers.layers:
-            _lock_bones(skeleton, lock, layers.visible[lock], layers.hair_cut)
+            rows = np.nonzero(layers.visible[lock])[0]
+            # A strand beside the head swings from its top. Hair hanging well below the head swings from under it: higher up it lies on it.
+            hangs = rows.max() - layers.hair_cut > (layers.hair_cut - rows.min()) * 0.25
+            _lock_bones(skeleton, lock, layers.visible[lock], layers.hair_cut if hangs else rows.min())
     if "bangs" in layers.layers:
         box = _bbox(layers.layers["bangs"][..., 3] > 0)
         skeleton.add("bangs", "head", ((box[0] + box[2]) / 2, box[1]))
@@ -809,6 +825,8 @@ def build_parts(layers, skeleton, relief=None, splat=None):
         bones, weights = skin(vertices, segments, max(blend * face_h, 1.0))
         if name == "torso":
             _soft_chest(layers, skeleton, vertices, bones, weights)
+        if (name.startswith("lock_") or name == "bangs") and "hair_top" in layers.visible:
+            _hold_hair(layers, skeleton, vertices, bones, weights)
         # Depth over the part's whole tile: vertices sample it, and the encoder turns it into the normal map.
         bx0, by0 = vertices.min(0).astype(int)
         bx1, by1 = vertices.max(0).astype(int) + 1
@@ -839,6 +857,19 @@ def build_parts(layers, skeleton, relief=None, splat=None):
     _add_mouth(layers, skeleton, parts, ellipse, unit, splat)
     _add_face_morphs(layers, parts)
     return {name: parts[name] for name in DRAW_ORDER if name in parts}
+
+
+def _hold_hair(layers, skeleton, vertices, bones, weights):
+    """Strands and bangs stay put where they join the hair of the head, or a seam would open between them when they swing."""
+    face_w = layers.face_box[2] - layers.face_box[0]
+    px = np.clip(vertices[:, 0].astype(int), 0, layers.width - 1)
+    py = np.clip(vertices[:, 1].astype(int), 0, layers.height - 1)
+    held = np.exp(-(cv2.distanceTransform((~layers.visible["hair_top"]).astype(np.uint8), cv2.DIST_L2, 5)[py, px] / (face_w * 0.25)) ** 2)
+    weights *= (1 - held)[:, None]
+    # The weakest influence makes room for the head.
+    bones[:, 3] = skeleton.index["head"]
+    weights[:, 3] = held
+    weights /= weights.sum(1, keepdims=True)
 
 
 def _soft_chest(layers, skeleton, vertices, bones, weights):
@@ -999,9 +1030,9 @@ def _add_variants(layers, variants):
                 layers.layers[name + "_" + side] = half
 
 
-def _chest_reach(layers):
+def _chest_reach(layers, height):
     """How far each breast may move, in world units: a share of its height."""
-    return {"breast_" + side: float(_bbox(mask)[3] - _bbox(mask)[1]) * 0.1 / layers.height for side, mask in layers.breasts.items()}
+    return {"breast_" + side: float(_bbox(mask)[3] - _bbox(mask)[1]) * 0.1 / height for side, mask in layers.breasts.items()}
 
 
 def build_avatar(seg, hidden=None, depth=None, plate=None, head_splat=None, splat_hair=False, variants=None, chest_physics=1.0):
@@ -1019,7 +1050,8 @@ def build_avatar(seg, hidden=None, depth=None, plate=None, head_splat=None, spla
     parts = build_parts(layers, skeleton, None if depth is None else _relief(depth, layers), splat)
     # The eyes look aside by a share of the iris: measured on the face, small eyes would roll out of sight.
     irises = [_bbox(layers.visible[name])[2] - _bbox(layers.visible[name])[0] for name in ("iris_l", "iris_r") if name in layers.layers]
-    gaze = float(np.mean(irises)) * 0.32 / layers.height if irises else 0.0
+    height = seg["pose"]["size"][1]
+    gaze = float(np.mean(irises)) * 0.32 / height if irises else 0.0
     params = build_params(skeleton.index, parts, gaze, splat is not None)
     return {"width": layers.width, "height": layers.height, "bones": skeleton.bones, "parts": parts, "params": params,
-            "clips": build_clips(params), "expressions": build_expressions(params), "springs": build_springs(skeleton.index, _chest_reach(layers), chest_physics), "face_box": [int(v) for v in layers.face_box], "head_splat": splat, "splat_hair": splat_hair}
+            "clips": build_clips(params), "expressions": build_expressions(params), "springs": build_springs(skeleton.index, _chest_reach(layers, height), chest_physics), "head_splat": splat, "splat_hair": splat_hair, "pose": seg["pose"]}

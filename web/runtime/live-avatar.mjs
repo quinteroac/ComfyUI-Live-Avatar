@@ -167,10 +167,24 @@ export class LiveAvatar extends THREE.Group {
       bone.name = b.name;
       return bone;
     });
+    // A bone with a roll hangs from a pivot holding it, so its own rotations and its children work in the leaning frame.
+    const lean = [];
+    const depth = new THREE.Vector3(0, 0, 1);
     header.bones.forEach((b, i) => {
       const parent = b.parent >= 0 ? header.bones[b.parent].position : [0, 0, 0];
-      this.bones[i].position.set(b.position[0] - parent[0], b.position[1] - parent[1], b.position[2] - parent[2]);
-      (b.parent >= 0 ? this.bones[b.parent] : this).add(this.bones[i]);
+      const offset = new THREE.Vector3(b.position[0] - parent[0], b.position[1] - parent[1], b.position[2] - parent[2]).applyAxisAngle(depth, -(lean[b.parent] ?? 0));
+      let holder = b.parent >= 0 ? this.bones[b.parent] : this;
+      if (b.roll) {
+        const pivot = new THREE.Object3D();
+        pivot.position.copy(offset);
+        pivot.rotation.z = b.roll;
+        holder.add(pivot);
+        holder = pivot;
+        offset.set(0, 0, 0);
+      }
+      this.bones[i].position.copy(offset);
+      holder.add(this.bones[i]);
+      lean[i] = (lean[b.parent] ?? 0) + (b.roll ?? 0);
     });
     this.boneByName = Object.fromEntries(this.bones.map((b) => [b.name, b]));
     this.rest = this.bones.map((b) => b.position.clone());
@@ -230,10 +244,15 @@ export class LiveAvatar extends THREE.Group {
       this.meshes[part.name] = mesh;
     }
 
-    this.springs = header.springs.filter((s) => this.boneByName[s.bone]).map((s) => ({
-      ...s, node: this.boneByName[s.bone], angle: 0, speed: 0, last: new THREE.Vector3(), lastSpeed: 0, primed: false,
-      offset: new THREE.Vector2(), velocity: new THREE.Vector2(), lastVelocity: new THREE.Vector3(),
-    }));
+    this.springs = header.springs.filter((s) => this.boneByName[s.bone]).map((s) => {
+      const node = this.boneByName[s.bone];
+      // Where the tip of the bone goes when it turns: square to the way it points at rest, which is down unless a next bone says otherwise.
+      const at = header.bones[this.bones.indexOf(node)].position;
+      const next = header.bones.find((b) => header.bones[b.parent]?.name === s.bone)?.position;
+      const across = next ? new THREE.Vector2(at[1] - next[1], next[0] - at[0]).normalize() : new THREE.Vector2(1, 0);
+      return { ...s, node, across, angle: 0, speed: 0, last: new THREE.Vector3(), primed: false,
+        offset: new THREE.Vector2(), velocity: new THREE.Vector2(), lastVelocity: new THREE.Vector3() };
+    });
   }
 
   setParam(name, value) {
@@ -378,12 +397,13 @@ export class LiveAvatar extends THREE.Group {
     }
   }
 
-  // Each spring is a damped angle pushed by the sideways acceleration of its bone. A hanging strand lags behind its root.
+  // Each spring is a damped angle pushed by the acceleration of its bone across the way it points. A strand lags behind its root.
   updateSprings(dt) {
     this.updateMatrixWorld(true);
     const step = Math.min(dt, 1 / 30);
     if (step <= 0) return;
     const position = new THREE.Vector3();
+    const velocity = new THREE.Vector3();
     for (const spring of this.springs) {
       if (spring.mode === "bounce") {
         this.bounce(spring, step);
@@ -394,10 +414,10 @@ export class LiveAvatar extends THREE.Group {
         spring.last.copy(position);
         spring.primed = true;
       }
-      const speed = (position.x - spring.last.x) / step;
-      const push = (speed - spring.lastSpeed) / step;
+      velocity.subVectors(position, spring.last).divideScalar(step);
+      const push = ((velocity.x - spring.lastVelocity.x) * spring.across.x + (velocity.y - spring.lastVelocity.y) * spring.across.y) / step;
       spring.last.copy(position);
-      spring.lastSpeed = speed;
+      spring.lastVelocity.copy(velocity);
       const wind = Math.sin(this.time * 1.3 + spring.gain * 3) * 0.3;
       const force = -spring.stiffness * spring.angle - spring.damping * spring.speed - push * spring.gain * 4 + wind * spring.gain;
       spring.speed += force * step;

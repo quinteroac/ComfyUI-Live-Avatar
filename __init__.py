@@ -12,7 +12,7 @@ from comfy_api.latest import ComfyExtension, io
 
 from . import lav, rig
 from .motion import motion_clip
-from .segment import segment
+from .segment import segment, upright
 from .variants import VARIANTS, import_variant, variant_request
 
 WEB_DIRECTORY = "web"
@@ -157,13 +157,15 @@ class LiveAvatarBuild(io.ComfyNode):
     @classmethod
     def execute(cls, segments, splat_hair=False, chest_physics=1.0, seethrough_parts=None, depth=None, plate=None, head_splat=None, variants=None) -> io.NodeOutput:
         hidden = None
-        height, width = segments["image"].shape[:2]
+        # Depth and See-through parts are made from the drawing; the segments sit on a canvas where the head stands straight.
+        pose = segments["pose"]
+        width, height = pose["size"]
         if depth is not None:
-            depth = cv2.resize(depth[0, ..., 0].cpu().numpy(), (width, height), interpolation=cv2.INTER_AREA)
+            depth = upright(cv2.resize(depth[0, ..., 0].cpu().numpy(), (width, height), interpolation=cv2.INTER_AREA), pose)
         if seethrough_parts is not None:
-            hidden = rig.seethrough_hidden(seethrough_parts, width, height)
+            hidden = {name: upright(layer, pose) for name, layer in rig.seethrough_hidden(seethrough_parts, width, height).items()}
             if depth is None:
-                depth = rig.seethrough_depth(seethrough_parts, width, height)
+                depth = upright(rig.seethrough_depth(seethrough_parts, width, height), pose)
         if plate is not None:
             plate = (plate[0, ..., :3].cpu().numpy() * 255).round().astype(np.uint8)
         if head_splat is not None:

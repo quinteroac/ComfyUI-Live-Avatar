@@ -2,6 +2,7 @@
 An avatar is either built ({"parts", "bones", ...} in pixels) or loaded from a file ({"header", "blob"})."""
 import io
 import json
+import math
 import struct
 
 import cv2
@@ -58,11 +59,12 @@ def _bleed(rgba):
     return out
 
 
-def _normals(field):
+def _normals(field, turn):
     """Normal map of a depth field in pixels, near is +z. Image rows go down, the avatar's y goes up.
     Slopes are halved: drawn faces are flat, and the head dome would put a hard terminator across the cheek."""
     gy, gx = np.gradient(cv2.GaussianBlur(field, (0, 0), 1.0))
-    normal = np.dstack([-gx * NORMAL_SLOPE, gy * NORMAL_SLOPE, np.ones_like(field)])
+    slope = np.dstack([gx, gy]) @ turn.T * NORMAL_SLOPE
+    normal = np.dstack([-slope[..., 0], slope[..., 1], np.ones_like(field)])
     normal /= np.linalg.norm(normal, axis=2, keepdims=True)
     return np.dstack([((normal * 0.5 + 0.5) * 255).round().astype(np.uint8), np.full(field.shape, 255, np.uint8)])
 
@@ -73,9 +75,21 @@ def _webp(rgba):
     return buffer.getvalue()
 
 
-def _bone_world(position, width, height):
-    x, y, z = position
-    return [(x - width / 2) / height, (height - y) / height, z / height]
+def _placement(avatar):
+    """An avatar is built on a canvas where the head stands straight. Returns the rotation and shift putting its pixels back on the drawing, and the drawing's size."""
+    roll, (width, height) = avatar["pose"]["roll"], avatar["pose"]["size"]
+    turn = np.array([[math.cos(roll), -math.sin(roll)], [math.sin(roll), math.cos(roll)]])
+    return turn, np.array([width / 2, height / 2]) - turn @ (avatar["width"] / 2, avatar["height"] / 2), width, height
+
+
+def _bones_world(avatar):
+    """Bone positions in world units: x centered, y up, one unit is the drawing's height."""
+    turn, shift, width, height = _placement(avatar)
+    out = []
+    for bone in avatar["bones"]:
+        x, y = turn @ bone["pos"][:2] + shift
+        out.append([(x - width / 2) / height, (height - y) / height, bone["pos"][2] / height])
+    return out
 
 
 def load(path):
@@ -92,7 +106,7 @@ def rig_of(avatar):
     if "header" in avatar:
         header = avatar["header"]
         return {b["name"]: np.array(b["position"], np.float64) for b in header["bones"]}, header["params"]
-    return {b["name"]: np.array(_bone_world(b["pos"], avatar["width"], avatar["height"]), np.float64) for b in avatar["bones"]}, avatar["params"]
+    return {b["name"]: np.array(position, np.float64) for b, position in zip(avatar["bones"], _bones_world(avatar))}, avatar["params"]
 
 
 def add_clip(avatar, name, clip):
@@ -121,7 +135,7 @@ def _head_splat(avatar, section, scale):
 def encode(avatar):
     if "header" in avatar:
         return _pack_header(avatar["header"], avatar["blob"])
-    width, height = avatar["width"], avatar["height"]
+    turn, shift, width, height = _placement(avatar)
     crops, sizes = {}, {}
     for name, part in avatar["parts"].items():
         if "texture" in part:
@@ -139,7 +153,7 @@ def encode(avatar):
         tile = crops[name][2]
         atlas[y:y + tile.shape[0], x:x + tile.shape[1]] = tile
         if "depth" in avatar["parts"][name]:
-            normals[y:y + tile.shape[0], x:x + tile.shape[1]] = _normals(avatar["parts"][name]["depth"])
+            normals[y:y + tile.shape[0], x:x + tile.shape[1]] = _normals(avatar["parts"][name]["depth"], turn)
 
     blob = io.BytesIO()
 
@@ -152,7 +166,8 @@ def encode(avatar):
     scale = 1 / height
 
     def world(xy, z):
-        """Pixels to world units: y up, one unit is the canvas height, x centered."""
+        """Pixels to world units: y up, one unit is the drawing's height, x centered."""
+        xy = xy @ turn.T + shift
         return np.stack([(xy[:, 0] - width / 2) * scale, (height - xy[:, 1]) * scale, z * scale], 1).astype(np.float32)
 
     parts = []
@@ -168,6 +183,7 @@ def encode(avatar):
             v = (y + vertices[:, 1] - crops[name][1]) / side
         morphs = {}
         for morph, delta in part["morphs"].items():
+            delta = delta @ turn.T
             data = np.zeros((len(vertices), 3), np.float32)
             data[:, 0] = delta[:, 0] * scale
             data[:, 1] = -delta[:, 1] * scale
@@ -181,7 +197,9 @@ def encode(avatar):
                       "morphs": morphs})
 
     atlas = {"section": section(_webp(atlas)), "normals": section(_webp(normals)), "size": side, "mime": "image/webp"}
-    bones = [{"name": b["name"], "parent": b["parent"], "position": _bone_world(b["pos"], width, height)} for b in avatar["bones"]]
+    bones = [{"name": b["name"], "parent": b["parent"], "position": position} for b, position in zip(avatar["bones"], _bones_world(avatar))]
+    # The head keeps its lean as a rest rotation, so it turns and nods about its own axes. Clockwise on the drawing is negative with y up.
+    next(bone for bone in bones if bone["name"] == "head")["roll"] = -avatar["pose"]["roll"]
     header = {"version": VERSION, "canvas": [width, height], "atlas": atlas, "bones": bones, "parts": parts, "params": avatar["params"],
               "clips": avatar["clips"], "expressions": avatar["expressions"], "springs": avatar["springs"]}
     if avatar["head_splat"] is not None:

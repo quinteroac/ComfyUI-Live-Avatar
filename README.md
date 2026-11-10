@@ -8,7 +8,7 @@ Needs [ComfyUI-WeVisOne-VL](https://huggingface.co/paralaif/ComfyUI-WeVisOne-VL)
 
 | Node | What it does |
 |---|---|
-| **Live Avatar Segment** | Splits the character with WeVisOne-VL: body parts on the full image, eyes, iris, lashes, brows and mouth on an enlarged head crop, plus joint points. |
+| **Live Avatar Segment** | Splits the character with WeVisOne-VL: body parts on the full image, eyes, iris, lashes, brows and mouth on an enlarged head crop, plus joint points. A leaning head is straightened first: segments, plate and variant crops come out on a turned canvas, and the saved avatar is put back as drawn. |
 | **Live Avatar Head Mask** | Matte of the head alone, for rebuilding it with Idol. |
 | **Live Avatar Plate** | Prepares the body hidden behind arms and hair for any inpaint pass. |
 | **Live Avatar Variant Mask** | Head crop and mask for inpainting one drawn variant: `eyes_closed`, `eyes_smile`, `mouth_a`, `mouth_i` or `mouth_o`. |
@@ -84,7 +84,7 @@ Little-endian: `"LAV1"`, `u32` JSON length, JSON header, then binary sections ad
 ```text
 version, canvas [w, h]
 atlas     section, normals (section, optional), size, mime (lossless WebP); both share the parts' uvs
-bones     name, parent index, position
+bones     name, parent index, position, roll (optional: rest rotation about z, for a leaning head)
 parts     draw order; position (f32 x3), uv (f32 x2), skinIndex (u16 x4), skinWeight (f32 x4), index (u32), morphs {name: f32 x3 deltas}
 params    name -> drivers [{bone, channel, scale}], morphs [part names] and/or fades [[part, start, end]]
 clips     name -> duration, loop, tracks [{param, keys [[time, value]], linear (optional)}]
@@ -94,6 +94,12 @@ headSplat optional: section (.spz), scale, position on the head bone, fade (laye
 ```
 
 The viewer adds expression buttons (keys 1 to 8), a text box for `speak`, a `light` toggle (drag over the avatar to move the light) and `poses`, a contact sheet of fixed poses to check a build, saved as PNG.
+
+## Posed drawings
+
+The character does not have to stand straight. The head's lean is read from the eyes, so blinks, mouths and the gaze follow it, and hair tied at the sides of the head swings like hanging hair does. Moving the avatar's group in your scene is what pushes hair and chest: springs react to its acceleration in any direction. In the viewer, drag the avatar to try it.
+
+`idle`, blinking and the springs suit any pose. `wave`, `happy` and `walk` move the limbs from a standing pose and tear a drawing whose arms cross the body.
 
 Vertices carry real depth, so turning the head in 3D gives parallax without extra drawings. Layers keep a fixed draw order and ignore the depth buffer. Everything in the viewer runs locally.
 
